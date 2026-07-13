@@ -3498,7 +3498,9 @@ async function exportPDF() {
         y += 5;
         try {
           const iW = W - mg*2, iH = 72;
-          doc.addImage(imgEl.src, 'JPEG', mg, y, iW, iH, undefined, 'FAST');
+          let imgSrcForPdf = imgEl.src;
+          try { imgSrcForPdf = await buildAnnotatedImageDataURL(); } catch (e) { /* fall back to raw preview image */ }
+          doc.addImage(imgSrcForPdf, 'JPEG', mg, y, iW, iH, undefined, 'NONE');
           doc.setDrawColor(237,232,232); doc.rect(mg, y, iW, iH, 'S');
           y += iH + 8;
         } catch(e) { y += 4; }
@@ -3566,6 +3568,85 @@ async function exportPDF() {
     btn.disabled = false;
     btn.innerHTML = origHTML;
   }
+}
+
+function buildAnnotatedImageDataURL() {
+  return new Promise((resolve, reject) => {
+    const imgEl = document.getElementById('preview-img');
+    if (!imgEl || !imgEl.src || imgEl.src.length < 10 || imgEl.src.endsWith('#')) {
+      reject(new Error('No image available'));
+      return;
+    }
+    const img = new Image();
+    let blobUrl = null;
+    if (currentImageFile) { blobUrl = URL.createObjectURL(currentImageFile); img.src = blobUrl; }
+    else { if (!imgEl.src.startsWith('data:')) img.crossOrigin = 'anonymous'; img.src = imgEl.src; }
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth  || 1200;
+      canvas.height = img.naturalHeight || 900;
+      const W = canvas.width, H = canvas.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, W, H);
+
+      if (_lastDetections && _lastDetections.length > 0) {
+        const colors   = { Platelet: '#22D3EE', RBC: '#f87171', WBC: '#fbbf24' };
+        const bgColors = { Platelet: 'rgba(34,211,238,0.18)', RBC: 'rgba(248,113,113,0.12)', WBC: 'rgba(251,191,36,0.12)' };
+        let platIdx = 0;
+        _lastDetections.forEach((det) => {
+          const [x1, y1, x2, y2] = det.bbox;
+          const bw = x2 - x1, bh = y2 - y1;
+          const color   = colors[det.class_name]   || '#ffffff';
+          const bgColor = bgColors[det.class_name] || 'rgba(255,255,255,0.1)';
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(x1, y1, bw, bh);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = det.class_name === 'Platelet' ? Math.max(2, W * 0.002) : Math.max(1.5, W * 0.0015);
+          ctx.strokeRect(x1, y1, bw, bh);
+          if (det.class_name === 'Platelet') {
+            platIdx++;
+            const label = `P${platIdx}`;
+            const fs = Math.max(10, Math.round(W * 0.012));
+            ctx.font = `bold ${fs}px Arial`;
+            const tw = ctx.measureText(label).width + 6;
+            const lh = fs + 6;
+            ctx.fillStyle = color;
+            ctx.fillRect(x1, y1 - lh, tw, lh);
+            ctx.fillStyle = '#0a0d14';
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillText(label, x1 + 3, y1 - lh / 2);
+          }
+        });
+        const legendItems = [
+          { label: 'Platelet', color: colors.Platelet },
+          { label: 'RBC',      color: colors.RBC },
+          { label: 'WBC',      color: colors.WBC },
+        ];
+        const lfs = Math.max(12, Math.round(W * 0.014));
+        const lItemH = lfs + 10, lPad = 10, lRectSz = lfs * 0.75;
+        const legendW = Math.round(W * 0.12);
+        let llx = W - legendW - 14, lly = 14;
+        legendItems.forEach(item => {
+          ctx.fillStyle = 'rgba(10,13,20,0.78)';
+          _roundRect(ctx, llx, lly, legendW, lItemH, 4); ctx.fill();
+          ctx.fillStyle = item.color;
+          ctx.fillRect(llx + lPad, lly + (lItemH - lRectSz) / 2, lRectSz, lRectSz);
+          ctx.fillStyle = '#ffffff'; ctx.font = `${lfs * 0.82}px Arial`;
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.fillText(item.label, llx + lPad + lRectSz + 6, lly + lItemH / 2);
+          lly += lItemH + 4;
+        });
+      }
+
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      try { resolve(canvas.toDataURL('image/jpeg', 0.95)); }
+      catch (e) { reject(e); }
+    };
+    img.onerror = function() {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      reject(new Error('Image failed to load'));
+    };
+  });
 }
 
 // ── Annotated Image Export ────────────────────────────────────────────
