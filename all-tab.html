@@ -3479,7 +3479,7 @@ async function exportPDF() {
         LOW:      { bg:[201,131,10],  txt:[253,243,224], desc:'Low — Daily CBC required. Monitor closely. Avoid aspirin/NSAIDs.' },
         DANGER:   { bg:[192,83,40],   txt:[255,240,230], desc:'Danger — Hospital admission recommended. Immediate clinical evaluation required.' },
         CRITICAL: { bg:[192,24,42],   txt:[253,241,242], desc:'Critical — ICU / transfusion required immediately. Seek emergency care now.' },
-        HIGH:     { bg:[124,58,237],  txt:[245,243,255], desc:'High — Thrombocytosis (≥ 400,000/µL). May indicate reactive condition. Follow-up recommended.' },
+        HIGH:     { bg:[124,58,237],  txt:[245,243,255], desc:'High — Thrombocytosis (> 400,000/µL). May indicate reactive condition. Follow-up recommended.' },
         UNKNOWN:  { bg:[107,114,128], txt:[243,244,246], desc:'No platelets detected — check image quality and focus.' },
       };
       const sc = sevCfg[severity] || sevCfg.NORMAL;
@@ -3527,7 +3527,7 @@ async function exportPDF() {
     doc.setDrawColor(190,181,181); doc.line(mg + 82, y - 1, W - mg, y - 1);
     y += 7;
     const refs = [
-      { range:'≥ 400,000 /µL',       label:'HIGH',     note:'Thrombocytosis',     rgb:[124,58,237],  bg:[245,243,255] },
+      { range:'> 400,000 /µL',       label:'HIGH',     note:'Thrombocytosis',     rgb:[124,58,237],  bg:[245,243,255] },
       { range:'150,000–399,999 /µL', label:'NORMAL',   note:'No intervention',    rgb:[15,110,86],   bg:[232,245,238] },
       { range:'50,000–149,999 /µL',  label:'LOW',      note:'Monitor closely',    rgb:[201,131,10],  bg:[254,252,232] },
       { range:'20,000–49,999 /µL',   label:'DANGER',   note:'Hospital admission', rgb:[192,83,40],   bg:[255,240,230] },
