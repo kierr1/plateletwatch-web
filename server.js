@@ -124,6 +124,22 @@ app.get('/api/test', async (req, res) => {
 // Requires inference_server.py to be running: python inference_server.py
 const INFERENCE_URL = process.env.INFERENCE_URL || 'http://localhost:8000';
 
+// ── Live queue status (so the frontend can show real position/wait time
+// instead of generic "processing..." text during a busy period) ────────
+app.get('/api/queue-status', async (req, res) => {
+  try {
+    const response = await fetch(`${INFERENCE_URL}/queue-status`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) throw new Error('Inference server queue-status not ok');
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    // Non-fatal -- the frontend just won't show live queue info if this fails.
+    res.status(503).json({ error: 'Queue status unavailable.' });
+  }
+});
+
 app.post('/api/analyze-image', aiLimiter, async (req, res) => {
   const { image, mediaType, zoom, confidence } = req.body;
 
