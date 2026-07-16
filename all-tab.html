@@ -1426,6 +1426,10 @@ body{background-image:none;}
           </button>
           <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleCameraCapture(event)">
           <div class="upload-controls-actions" style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gray-600);cursor:pointer;user-select:none;" title="Automatically corrects white balance and contrast before analysis, so smears with different lighting/staining aren't wrongly rejected or mis-scored.">
+              <input type="checkbox" id="chk-auto-enhance" checked style="width:14px;height:14px;cursor:pointer;">
+              Auto-enhance (white balance / contrast)
+            </label>
             <button class="btn-outline" id="btn-toggle-session" onclick="toggleFieldSession()" aria-label="Start 10-field session for accurate platelet count" title="Clinically recommended: scan 10 fields, average, then × 20,000">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 7h5M7 4.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
               10-Field Session
@@ -2843,6 +2847,92 @@ function fileToBase64(file) {
   });
 }
 
+// ── Auto-Enhance (white balance + contrast) ─────────────────────────────
+// Runs entirely client-side in a <canvas> before the image is uploaded.
+// Microscope photos vary a lot in white balance (different light sources)
+// and saturation/contrast (different staining, exposure). Rather than
+// trying to train smear_gate.pt to recognize every possible lighting
+// condition, we normalize the image first so the gate + detection models
+// always see a consistent color/contrast profile — the same approach used
+// in digital pathology pipelines for stain/lighting normalization.
+function clampByte(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+
+// Percentile contrast stretch for one RGBA channel: clips the darkest/
+// brightest 1% of pixels (so a few outlier pixels don't skew things), then
+// stretches the remaining range to fill the full 0–255 range.
+function stretchChannel(data, channelOffset, pixelCount) {
+  const hist = new Uint32Array(256);
+  for (let i = channelOffset; i < data.length; i += 4) hist[data[i]]++;
+  const clip = Math.floor(pixelCount * 0.01);
+  let lo = 0, acc = 0;
+  for (; lo < 255; lo++) { acc += hist[lo]; if (acc > clip) break; }
+  let hi = 255; acc = 0;
+  for (; hi > 0; hi--) { acc += hist[hi]; if (acc > clip) break; }
+  if (hi <= lo) return; // degenerate (near-flat) channel, skip
+  const range = hi - lo;
+  for (let i = channelOffset; i < data.length; i += 4) {
+    data[i] = clampByte((data[i] - lo) * 255 / range);
+  }
+}
+
+// Takes a base64 string (no data: prefix) + its media type, returns a
+// Promise resolving to { base64, dataUrl, mediaType } for the enhanced
+// image. Falls back silently to the original image on any failure.
+function enhanceImageBase64(base64Data, mediaType) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const pixelCount = canvas.width * canvas.height;
+
+        // 1) Gray-world white balance — scales each channel so its average
+        // matches the overall gray average, correcting color-temperature
+        // tint differences between microscope light sources/cameras.
+        let sumR = 0, sumG = 0, sumB = 0;
+        for (let i = 0; i < data.length; i += 4) { sumR += data[i]; sumG += data[i + 1]; sumB += data[i + 2]; }
+        const avgR = sumR / pixelCount, avgG = sumG / pixelCount, avgB = sumB / pixelCount;
+        const avgGray = (avgR + avgG + avgB) / 3;
+        const clampGain = (v) => Math.min(2, Math.max(0.5, v)); // don't overcorrect extreme images
+        const gR = clampGain(avgR > 0 ? avgGray / avgR : 1);
+        const gG = clampGain(avgG > 0 ? avgGray / avgG : 1);
+        const gB = clampGain(avgB > 0 ? avgGray / avgB : 1);
+        for (let i = 0; i < data.length; i += 4) {
+          data[i]     = clampByte(data[i] * gR);
+          data[i + 1] = clampByte(data[i + 1] * gG);
+          data[i + 2] = clampByte(data[i + 2] * gB);
+        }
+
+        // 2) Percentile contrast stretch per channel — approximates what
+        // CLAHE achieves (using the full dynamic range) so low-contrast /
+        // under- or over-saturated smears look consistent to the models.
+        stretchChannel(data, 0, pixelCount);
+        stretchChannel(data, 1, pixelCount);
+        stretchChannel(data, 2, pixelCount);
+
+        ctx.putImageData(imageData, 0, 0);
+        const outType = (mediaType === 'image/png') ? 'image/png' : 'image/jpeg';
+        const dataUrl = canvas.toDataURL(outType, 0.92);
+        resolve({ base64: dataUrl.split(',')[1], dataUrl, mediaType: outType });
+      } catch (e) {
+        console.warn('Auto-enhance failed, using original image:', e);
+        resolve({ base64: base64Data, dataUrl: 'data:' + mediaType + ';base64,' + base64Data, mediaType });
+      }
+    };
+    img.onerror = () => {
+      console.warn('Auto-enhance: could not load image, using original.');
+      resolve({ base64: base64Data, dataUrl: 'data:' + mediaType + ';base64,' + base64Data, mediaType });
+    };
+    img.src = 'data:' + mediaType + ';base64,' + base64Data;
+  });
+}
+
 // ── Smear Gate Rejection Overlay ────────────────────────────────────────
 // Shown directly on top of the preview image when the backend's smear_gate
 // classifier decides the uploaded photo isn't a plausible blood smear.
@@ -3062,14 +3152,47 @@ async function _runPlateletCount() {
     'Estimating count per µL and severity…'
   ];
   let stepIdx = 0;
+  let queuePollActive = true;
   const stepTimer = setInterval(() => {
     stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
     const el = document.getElementById('ai-progress-text');
     if (el) el.textContent = progressSteps[stepIdx];
   }, 3500);
+
+  // Poll real queue status so a busy backend shows an honest position/wait
+  // instead of leaving the user staring at generic text for up to 120s.
+  const queuePoll = setInterval(async () => {
+    if (!queuePollActive) return;
+    try {
+      const qres = await fetch('/api/queue-status');
+      if (!qres.ok) return;
+      const q = await qres.json();
+      if (q.active_requests > 0) {
+        const el = document.getElementById('ai-progress-text');
+        if (el) {
+          el.textContent = `Server busy — ${q.active_requests} request(s) ahead of you, ` +
+            `est. wait ~${Math.round(q.avg_time || 5)}s each…`;
+        }
+      }
+    } catch (_) { /* non-fatal, just skip this poll */ }
+  }, 2500);
   try {
-    const base64Data = await fileToBase64(currentImageFile);
-    const mediaType = currentImageFile.type || 'image/jpeg';
+    let base64Data = await fileToBase64(currentImageFile);
+    let mediaType = currentImageFile.type || 'image/jpeg';
+
+    const autoEnhanceOn = document.getElementById('chk-auto-enhance')?.checked;
+    if (autoEnhanceOn) {
+      const el = document.getElementById('ai-progress-text');
+      if (el) el.textContent = 'Auto-correcting white balance & contrast…';
+      const enhanced = await enhanceImageBase64(base64Data, mediaType);
+      base64Data = enhanced.base64;
+      mediaType = enhanced.mediaType;
+      // Show the enhanced version in the preview so the user can see what
+      // was actually sent for analysis.
+      const previewImg = document.getElementById('preview-img');
+      if (previewImg) previewImg.src = enhanced.dataUrl;
+    }
+
     // Read selected zoom from radio buttons
     const selectedZoom = (document.querySelector('input[name="zoom-select"]:checked') || {}).value || '40x';
     const response = await fetch('/api/analyze-image', {
@@ -3078,6 +3201,8 @@ async function _runPlateletCount() {
       body: JSON.stringify({ image: base64Data, mediaType, zoom: selectedZoom })
     });
     clearInterval(stepTimer);
+    queuePollActive = false;
+    clearInterval(queuePoll);
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'API error: ' + response.status);
@@ -3133,6 +3258,8 @@ async function _runPlateletCount() {
     }
   } catch (err) {
     clearInterval(stepTimer);
+    queuePollActive = false;
+    clearInterval(queuePoll);
     console.error('countPlatelets error:', err);
     const errEl = document.getElementById('result-severity');
     errEl.style.display = 'block';
@@ -3479,7 +3606,7 @@ async function exportPDF() {
         LOW:      { bg:[201,131,10],  txt:[253,243,224], desc:'Low — Daily CBC required. Monitor closely. Avoid aspirin/NSAIDs.' },
         DANGER:   { bg:[192,83,40],   txt:[255,240,230], desc:'Danger — Hospital admission recommended. Immediate clinical evaluation required.' },
         CRITICAL: { bg:[192,24,42],   txt:[253,241,242], desc:'Critical — ICU / transfusion required immediately. Seek emergency care now.' },
-        HIGH:     { bg:[124,58,237],  txt:[245,243,255], desc:'High — Thrombocytosis (> 400,000/µL). May indicate reactive condition. Follow-up recommended.' },
+        HIGH:     { bg:[124,58,237],  txt:[245,243,255], desc:'High — Thrombocytosis (≥ 400,000/µL). May indicate reactive condition. Follow-up recommended.' },
         UNKNOWN:  { bg:[107,114,128], txt:[243,244,246], desc:'No platelets detected — check image quality and focus.' },
       };
       const sc = sevCfg[severity] || sevCfg.NORMAL;
@@ -3498,9 +3625,7 @@ async function exportPDF() {
         y += 5;
         try {
           const iW = W - mg*2, iH = 72;
-          let imgSrcForPdf = imgEl.src;
-          try { imgSrcForPdf = await buildAnnotatedImageDataURL(); } catch (e) { /* fall back to raw preview image */ }
-          doc.addImage(imgSrcForPdf, 'JPEG', mg, y, iW, iH, undefined, 'NONE');
+          doc.addImage(imgEl.src, 'JPEG', mg, y, iW, iH, undefined, 'FAST');
           doc.setDrawColor(237,232,232); doc.rect(mg, y, iW, iH, 'S');
           y += iH + 8;
         } catch(e) { y += 4; }
@@ -3529,7 +3654,7 @@ async function exportPDF() {
     doc.setDrawColor(190,181,181); doc.line(mg + 82, y - 1, W - mg, y - 1);
     y += 7;
     const refs = [
-      { range:'> 400,000 /µL',       label:'HIGH',     note:'Thrombocytosis',     rgb:[124,58,237],  bg:[245,243,255] },
+      { range:'≥ 400,000 /µL',       label:'HIGH',     note:'Thrombocytosis',     rgb:[124,58,237],  bg:[245,243,255] },
       { range:'150,000–399,999 /µL', label:'NORMAL',   note:'No intervention',    rgb:[15,110,86],   bg:[232,245,238] },
       { range:'50,000–149,999 /µL',  label:'LOW',      note:'Monitor closely',    rgb:[201,131,10],  bg:[254,252,232] },
       { range:'20,000–49,999 /µL',   label:'DANGER',   note:'Hospital admission', rgb:[192,83,40],   bg:[255,240,230] },
@@ -3568,85 +3693,6 @@ async function exportPDF() {
     btn.disabled = false;
     btn.innerHTML = origHTML;
   }
-}
-
-function buildAnnotatedImageDataURL() {
-  return new Promise((resolve, reject) => {
-    const imgEl = document.getElementById('preview-img');
-    if (!imgEl || !imgEl.src || imgEl.src.length < 10 || imgEl.src.endsWith('#')) {
-      reject(new Error('No image available'));
-      return;
-    }
-    const img = new Image();
-    let blobUrl = null;
-    if (currentImageFile) { blobUrl = URL.createObjectURL(currentImageFile); img.src = blobUrl; }
-    else { if (!imgEl.src.startsWith('data:')) img.crossOrigin = 'anonymous'; img.src = imgEl.src; }
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      canvas.width  = img.naturalWidth  || 1200;
-      canvas.height = img.naturalHeight || 900;
-      const W = canvas.width, H = canvas.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, W, H);
-
-      if (_lastDetections && _lastDetections.length > 0) {
-        const colors   = { Platelet: '#22D3EE', RBC: '#f87171', WBC: '#fbbf24' };
-        const bgColors = { Platelet: 'rgba(34,211,238,0.18)', RBC: 'rgba(248,113,113,0.12)', WBC: 'rgba(251,191,36,0.12)' };
-        let platIdx = 0;
-        _lastDetections.forEach((det) => {
-          const [x1, y1, x2, y2] = det.bbox;
-          const bw = x2 - x1, bh = y2 - y1;
-          const color   = colors[det.class_name]   || '#ffffff';
-          const bgColor = bgColors[det.class_name] || 'rgba(255,255,255,0.1)';
-          ctx.fillStyle = bgColor;
-          ctx.fillRect(x1, y1, bw, bh);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = det.class_name === 'Platelet' ? Math.max(2, W * 0.002) : Math.max(1.5, W * 0.0015);
-          ctx.strokeRect(x1, y1, bw, bh);
-          if (det.class_name === 'Platelet') {
-            platIdx++;
-            const label = `P${platIdx}`;
-            const fs = Math.max(10, Math.round(W * 0.012));
-            ctx.font = `bold ${fs}px Arial`;
-            const tw = ctx.measureText(label).width + 6;
-            const lh = fs + 6;
-            ctx.fillStyle = color;
-            ctx.fillRect(x1, y1 - lh, tw, lh);
-            ctx.fillStyle = '#0a0d14';
-            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(label, x1 + 3, y1 - lh / 2);
-          }
-        });
-        const legendItems = [
-          { label: 'Platelet', color: colors.Platelet },
-          { label: 'RBC',      color: colors.RBC },
-          { label: 'WBC',      color: colors.WBC },
-        ];
-        const lfs = Math.max(12, Math.round(W * 0.014));
-        const lItemH = lfs + 10, lPad = 10, lRectSz = lfs * 0.75;
-        const legendW = Math.round(W * 0.12);
-        let llx = W - legendW - 14, lly = 14;
-        legendItems.forEach(item => {
-          ctx.fillStyle = 'rgba(10,13,20,0.78)';
-          _roundRect(ctx, llx, lly, legendW, lItemH, 4); ctx.fill();
-          ctx.fillStyle = item.color;
-          ctx.fillRect(llx + lPad, lly + (lItemH - lRectSz) / 2, lRectSz, lRectSz);
-          ctx.fillStyle = '#ffffff'; ctx.font = `${lfs * 0.82}px Arial`;
-          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-          ctx.fillText(item.label, llx + lPad + lRectSz + 6, lly + lItemH / 2);
-          lly += lItemH + 4;
-        });
-      }
-
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-      try { resolve(canvas.toDataURL('image/jpeg', 0.95)); }
-      catch (e) { reject(e); }
-    };
-    img.onerror = function() {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-      reject(new Error('Image failed to load'));
-    };
-  });
 }
 
 // ── Annotated Image Export ────────────────────────────────────────────
@@ -4312,18 +4358,6 @@ var darkCSS = [
   'body.dark-mode [style*="color:var(--text-muted)"]{color:#66708a!important;}',
   'body.dark-mode [style*="background:var(--white)"]{background:#1c1f2b!important;}',
   'body.dark-mode [style*="background: var(--white)"]{background:#1c1f2b!important;}',
-  'body.dark-mode .faq-panel{background:#1c1f2b!important;border-color:rgba(255,255,255,.09)!important;}',
-  'body.dark-mode .faq-messages{background:#13151f!important;}',
-  'body.dark-mode .chat-msg.bot .chat-bubble{background:#1c1f2b!important;color:#eceff8!important;border-color:rgba(255,255,255,.09)!important;}',
-  'body.dark-mode .chat-msg.bot .chat-bubble strong{color:#ff6b8a!important;}',
-  'body.dark-mode .chat-msg.user .chat-bubble{color:#fff!important;}',
-  'body.dark-mode .chat-time{color:#66708a!important;}',
-  'body.dark-mode .chat-chip{background:#1c1f2b!important;color:#ff6b8a!important;border-color:rgba(255,255,255,.13)!important;}',
-  'body.dark-mode .chat-chips{background:#13151f!important;}',
-  'body.dark-mode .faq-input-row{background:#1c1f2b!important;border-color:rgba(255,255,255,.09)!important;}',
-  'body.dark-mode .faq-input{background:#13151f!important;color:#eceff8!important;border-color:rgba(255,255,255,.12)!important;}',
-  'body.dark-mode .faq-input::placeholder{color:#66708a!important;}',
-  'body.dark-mode .faq-scope-ribbon{background:#1e1200!important;color:#c9a96a!important;border-color:rgba(255,255,255,.09)!important;}',
 ].join('\n');
 
 function applyDark(enable) {
