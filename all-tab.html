@@ -486,6 +486,30 @@ body{background-image:radial-gradient(var(--warm-gray) 1px,transparent 1px);back
 .cam-btn-use:hover{background:#0a5d61;}
 @media(max-width:520px){.camera-modal-box{border-radius:var(--radius-md);}.cam-btn-capture{width:54px;height:54px;}.camera-controls{padding:14px 12px;gap:10px;}}
 
+/* ── CROP MODAL ────────────────────────────────────────────────────── */
+.crop-modal-overlay{position:fixed;inset:0;background:rgba(10,6,8,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s ease;}
+.crop-modal-overlay.open{opacity:1;pointer-events:all;}
+.crop-modal-box{background:#0a0d14;border-radius:var(--radius-lg);width:min(640px,95vw);overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);transform:translateY(18px) scale(.97);transition:transform .22s ease,opacity .22s ease;opacity:0;display:flex;flex-direction:column;}
+.crop-modal-overlay.open .crop-modal-box{transform:translateY(0) scale(1);opacity:1;}
+.crop-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);}
+.crop-modal-title{font-family:var(--font-display);font-size:16px;color:#FEFEFE;display:flex;align-items:center;gap:8px;}
+.crop-modal-title svg{color:#22D3EE;}
+.crop-modal-close{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:background .15s;}
+.crop-modal-close:hover{background:rgba(255,255,255,.22);}
+.crop-modal-note{padding:10px 18px 0;font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;}
+.crop-viewport{position:relative;width:100%;max-height:60vh;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:14px 18px;box-sizing:border-box;}
+.crop-stage{position:relative;max-width:100%;max-height:56vh;user-select:none;-webkit-user-select:none;touch-action:none;}
+.crop-stage img{display:block;max-width:100%;max-height:56vh;pointer-events:none;-webkit-user-drag:none;}
+.crop-selection{position:absolute;border:2px dashed #22D3EE;background:rgba(34,211,238,.12);box-shadow:0 0 0 9999px rgba(0,0,0,.5);cursor:move;}
+.crop-selection .crop-handle{position:absolute;width:14px;height:14px;background:#22D3EE;border:2px solid #0a0d14;border-radius:3px;}
+.crop-handle.nw{top:-8px;left:-8px;cursor:nwse-resize;}
+.crop-handle.ne{top:-8px;right:-8px;cursor:nesw-resize;}
+.crop-handle.sw{bottom:-8px;left:-8px;cursor:nesw-resize;}
+.crop-handle.se{bottom:-8px;right:-8px;cursor:nwse-resize;}
+.crop-modal-controls{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;background:rgba(255,255,255,.03);border-top:1px solid rgba(255,255,255,.08);flex-wrap:wrap;}
+.crop-modal-controls .crop-actions{display:flex;gap:10px;margin-left:auto;}
+@media(max-width:520px){.crop-modal-box{border-radius:var(--radius-md);}.crop-modal-controls{padding:12px;}.crop-modal-controls .crop-actions{width:100%;margin-left:0;}.crop-modal-controls .crop-actions button{flex:1;}}
+
 /* ── FULLSCREEN FEED MODAL ─────────────────────────────── */
 .feed-modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,6,8,.72);z-index:800;align-items:flex-start;justify-content:flex-start;backdrop-filter:blur(4px);overflow:hidden;}
 .feed-modal-overlay.open{display:flex;animation:fadeInOverlay .2s ease;}
@@ -1768,6 +1792,41 @@ body{background-image:none;}
   </div>
 </div>
 
+<!-- CROP MODAL: shown right after any image is captured/uploaded, before analysis is allowed -->
+<div class="crop-modal-overlay" id="crop-modal" role="dialog" aria-modal="true" aria-label="Crop photo before analysis">
+  <div class="crop-modal-box">
+    <div class="crop-modal-head">
+      <div class="crop-modal-title">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 2v12a2 2 0 0 0 2 2h10"/><path d="M14 18V6a2 2 0 0 0-2-2H2"/></svg>
+        Crop Photo First
+      </div>
+      <button class="crop-modal-close" onclick="cancelCropModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="crop-modal-note">Drag a box around the blood smear field you want analyzed. Cropping out empty edges, glare, or slide borders improves detection accuracy.</div>
+    <div class="crop-viewport">
+      <div class="crop-stage" id="crop-stage">
+        <img id="crop-stage-img" src="" alt="Photo to crop" draggable="false">
+        <div class="crop-selection" id="crop-selection" style="display:none;">
+          <div class="crop-handle nw" data-handle="nw"></div>
+          <div class="crop-handle ne" data-handle="ne"></div>
+          <div class="crop-handle sw" data-handle="sw"></div>
+          <div class="crop-handle se" data-handle="se"></div>
+        </div>
+      </div>
+    </div>
+    <div class="crop-modal-controls">
+      <button class="btn-outline" onclick="resetCropSelection()" style="padding:9px 16px;">Reset Selection</button>
+      <div class="crop-actions">
+        <button class="btn-outline" onclick="skipCropModal()" style="padding:9px 16px;">Use Without Cropping</button>
+        <button class="btn-primary-sm" onclick="applyCropModal()" id="crop-apply-btn" style="padding:9px 18px;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
+          Crop &amp; Continue
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- LOGOUT MODAL -->
 <div class="modal-overlay" id="logout-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal-box">
@@ -2648,6 +2707,7 @@ function handleCameraCapture(e) {
 }
 function showImagePreview(file) {
   currentImageFile = file;
+  _imageCropped = false; // every newly captured/uploaded image must be reviewed in the crop step before analysis
   hideSmearGateOverlay();
   // Clear any leftover bounding boxes / detections from a previous image so
   // a rejected (or different) image never shows stale platelet markers.
@@ -2663,9 +2723,156 @@ function showImagePreview(file) {
     document.getElementById('upload-zone-sub').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
     document.getElementById('analysis-result').style.display = 'none';
     document.getElementById('btn-save-analysis').style.display = 'none';
+    // Sequence: always ask the user to crop the photo before it can be analyzed.
+    openCropModal(ev.target.result);
   };
   reader.readAsDataURL(file);
 }
+
+// ── Crop-first Modal ────────────────────────────────────────────────
+// Forces a "crop this photo" step between capture/upload and analysis.
+let _imageCropped = false;
+let _cropDrag = null; // {mode:'new'|'move'|'resize', handle, startX, startY, startBox}
+let _cropBox = null;  // {x,y,w,h} in stage (rendered, not natural) pixels
+
+function openCropModal(dataURL) {
+  const modal = document.getElementById('crop-modal');
+  const img = document.getElementById('crop-stage-img');
+  _cropBox = null;
+  document.getElementById('crop-selection').style.display = 'none';
+  img.onload = function() { _initCropHandlers(); };
+  img.src = dataURL;
+  modal.classList.add('open');
+}
+
+function _stageEl() { return document.getElementById('crop-stage'); }
+function _selEl() { return document.getElementById('crop-selection'); }
+
+function _initCropHandlers() {
+  const stage = _stageEl();
+  if (stage._cropBound) return; // bind listeners once
+  stage._cropBound = true;
+  stage.addEventListener('mousedown', _cropPointerDown);
+  stage.addEventListener('touchstart', _cropPointerDown, { passive: false });
+  window.addEventListener('mousemove', _cropPointerMove);
+  window.addEventListener('touchmove', _cropPointerMove, { passive: false });
+  window.addEventListener('mouseup', _cropPointerUp);
+  window.addEventListener('touchend', _cropPointerUp);
+}
+
+function _cropPoint(e) {
+  const stage = _stageEl();
+  const rect = stage.getBoundingClientRect();
+  const t = e.touches && e.touches[0] ? e.touches[0] : e;
+  return { x: Math.min(Math.max(t.clientX - rect.left, 0), rect.width), y: Math.min(Math.max(t.clientY - rect.top, 0), rect.height) };
+}
+
+function _cropPointerDown(e) {
+  const handleEl = e.target.closest && e.target.closest('.crop-handle');
+  const selEl = _selEl();
+  const p = _cropPoint(e);
+  if (handleEl) {
+    _cropDrag = { mode: 'resize', handle: handleEl.dataset.handle, startX: p.x, startY: p.y, startBox: Object.assign({}, _cropBox) };
+  } else if (e.target === selEl && _cropBox) {
+    _cropDrag = { mode: 'move', startX: p.x, startY: p.y, startBox: Object.assign({}, _cropBox) };
+  } else {
+    _cropDrag = { mode: 'new', startX: p.x, startY: p.y };
+    _cropBox = { x: p.x, y: p.y, w: 0, h: 0 };
+    _renderCropBox();
+  }
+  e.preventDefault();
+}
+
+function _cropPointerMove(e) {
+  if (!_cropDrag) return;
+  const stage = _stageEl();
+  const rect = stage.getBoundingClientRect();
+  const p = _cropPoint(e);
+  if (_cropDrag.mode === 'new') {
+    const x1 = Math.min(_cropDrag.startX, p.x), x2 = Math.max(_cropDrag.startX, p.x);
+    const y1 = Math.min(_cropDrag.startY, p.y), y2 = Math.max(_cropDrag.startY, p.y);
+    _cropBox = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  } else if (_cropDrag.mode === 'move') {
+    const dx = p.x - _cropDrag.startX, dy = p.y - _cropDrag.startY;
+    let nx = _cropDrag.startBox.x + dx, ny = _cropDrag.startBox.y + dy;
+    nx = Math.min(Math.max(nx, 0), rect.width - _cropDrag.startBox.w);
+    ny = Math.min(Math.max(ny, 0), rect.height - _cropDrag.startBox.h);
+    _cropBox = { x: nx, y: ny, w: _cropDrag.startBox.w, h: _cropDrag.startBox.h };
+  } else if (_cropDrag.mode === 'resize') {
+    let { x, y, w, h } = _cropDrag.startBox;
+    let x2 = x + w, y2 = y + h;
+    if (_cropDrag.handle.includes('n')) y = Math.min(p.y, y2 - 10);
+    if (_cropDrag.handle.includes('s')) y2 = Math.max(p.y, y + 10);
+    if (_cropDrag.handle.includes('w')) x = Math.min(p.x, x2 - 10);
+    if (_cropDrag.handle.includes('e')) x2 = Math.max(p.x, x + 10);
+    _cropBox = { x: Math.max(x, 0), y: Math.max(y, 0), w: Math.min(x2, rect.width) - Math.max(x, 0), h: Math.min(y2, rect.height) - Math.max(y, 0) };
+  }
+  _renderCropBox();
+  e.preventDefault();
+}
+
+function _cropPointerUp() { _cropDrag = null; }
+
+function _renderCropBox() {
+  const sel = _selEl();
+  if (!_cropBox || _cropBox.w < 4 || _cropBox.h < 4) { sel.style.display = 'none'; return; }
+  sel.style.display = 'block';
+  sel.style.left = _cropBox.x + 'px';
+  sel.style.top = _cropBox.y + 'px';
+  sel.style.width = _cropBox.w + 'px';
+  sel.style.height = _cropBox.h + 'px';
+}
+
+function resetCropSelection() {
+  _cropBox = null;
+  _selEl().style.display = 'none';
+}
+
+function skipCropModal() {
+  _imageCropped = true; // user explicitly chose to proceed with the uncropped photo
+  document.getElementById('crop-modal').classList.remove('open');
+}
+
+function cancelCropModal() {
+  // Closing without an explicit choice is treated the same as "skip" so the
+  // user is never left with an image stuck behind a modal they can't escape.
+  skipCropModal();
+}
+
+function applyCropModal() {
+  const img = document.getElementById('crop-stage-img');
+  if (!_cropBox || _cropBox.w < 4 || _cropBox.h < 4) {
+    showErrorModal('No Crop Area Selected', 'Drag a box over the part of the photo you want to keep, or tap "Use Without Cropping".');
+    return;
+  }
+  const stage = _stageEl();
+  const rect = stage.getBoundingClientRect();
+  const scaleX = img.naturalWidth / rect.width;
+  const scaleY = img.naturalHeight / rect.height;
+  const sx = _cropBox.x * scaleX, sy = _cropBox.y * scaleY;
+  const sw = _cropBox.w * scaleX, sh = _cropBox.h * scaleY;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(sw));
+  canvas.height = Math.max(1, Math.round(sh));
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+  const mediaType = (currentImageFile && currentImageFile.type) || 'image/jpeg';
+  canvas.toBlob(function(blob) {
+    if (!blob) { showErrorModal('Crop Failed', 'Could not process the crop. Please try again or use the photo without cropping.'); return; }
+    const baseName = (currentImageFile && currentImageFile.name ? currentImageFile.name.replace(/\.[^.]+$/, '') : 'microscope_capture') + '_cropped.jpg';
+    const croppedFile = new File([blob], baseName, { type: mediaType });
+    currentImageFile = croppedFile;
+    _imageCropped = true;
+    document.getElementById('preview-img').src = canvas.toDataURL(mediaType, 0.95);
+    document.getElementById('crop-modal').classList.remove('open');
+  }, mediaType.startsWith('image/') ? mediaType : 'image/jpeg', 0.95);
+}
+
+document.getElementById('crop-modal').addEventListener('click', function(e) {
+  if (e.target === this) cancelCropModal();
+});
 function clearImage() {
   const old = document.getElementById('detection-canvas');
   if (old) old.remove();
@@ -3089,6 +3296,11 @@ async function countPlatelets() {
     zone.style.background = 'var(--crimson-pale)';
     setTimeout(() => { zone.style.borderColor = ''; zone.style.background = ''; }, 1800);
     showErrorModal('No Image Uploaded', 'Please upload or capture a microscope image first before running the analysis.');
+    return;
+  }
+
+  if (!_imageCropped) {
+    openCropModal(document.getElementById('preview-img').src);
     return;
   }
 
