@@ -1375,6 +1375,20 @@ body{background-image:none;}
           </div>
         </div>
 
+        <!-- ★ BOUNDING BOX CONFIDENCE THRESHOLD -->
+        <div id="bbox-threshold-control" style="display:none;align-items:center;gap:12px;background:var(--off-white);border:1px solid var(--warm-gray);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:7px;min-width:0;">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="var(--text-mid)" stroke-width="1.4" aria-hidden="true"><rect x="1.5" y="1.5" width="12" height="12" rx="2.5"/><path d="M4 7.5h7" stroke-linecap="round"/></svg>
+            <span style="font-size:12px;font-weight:600;color:var(--text-mid);white-space:nowrap;">Bounding box threshold</span>
+          </div>
+          <input type="range" id="bbox-threshold-slider" min="0" max="100" value="0" step="1" oninput="onBboxThresholdChange(this.value)" style="flex:1;min-width:120px;accent-color:var(--teal);">
+          <span id="bbox-threshold-val" style="font-size:11.5px;font-weight:700;color:var(--teal);min-width:34px;text-align:right;">0%</span>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="bbox-hide-all" onchange="onBboxHideAllToggle(this.checked)" style="cursor:pointer;">
+            Hide all boxes
+          </label>
+        </div>
+
         <!-- ★ IMAGE QUALITY ENHANCER -->
         <div id="enhancer-panel">
           <div id="enhancer-header">
@@ -2714,6 +2728,8 @@ function showImagePreview(file) {
   const oldCanvas = document.getElementById('detection-canvas');
   if (oldCanvas) oldCanvas.remove();
   _lastDetections = [];
+  const oldThresholdCtrl = document.getElementById('bbox-threshold-control');
+  if (oldThresholdCtrl) oldThresholdCtrl.style.display = 'none';
   const reader = new FileReader();
   reader.onload = function(ev) {
     document.getElementById('preview-img').src = ev.target.result;
@@ -2879,6 +2895,8 @@ function clearImage() {
   currentImageFile = null;
   currentAnalysisResult = null;
   _lastDetections = [];
+  const thresholdCtrl = document.getElementById('bbox-threshold-control');
+  if (thresholdCtrl) thresholdCtrl.style.display = 'none';
   document.getElementById('image-preview-area').style.display = 'none';
   document.getElementById('upload-zone').style.display = '';
   document.getElementById('upload-zone-text').textContent = 'Drop microscope image here';
@@ -3197,16 +3215,48 @@ function displayAnalysisResult(platelets, rbc, wbc, estPerUl, severity, note, zo
 
 // ── YOLOv8 Bounding Box Overlay ────────────────────────────────────────
 let _lastDetections = [];
+let _bboxThreshold = 0;   // 0–1, minimum confidence required to draw a box
+let _bboxHideAll = false; // manual "hide all boxes" override
+
+function onBboxThresholdChange(sliderVal) {
+  _bboxThreshold = Math.max(0, Math.min(100, Number(sliderVal))) / 100;
+  const label = document.getElementById('bbox-threshold-val');
+  if (label) label.textContent = Math.round(_bboxThreshold * 100) + '%';
+  drawDetectionBoxes(_lastDetections);
+}
+
+function onBboxHideAllToggle(checked) {
+  _bboxHideAll = !!checked;
+  const slider = document.getElementById('bbox-threshold-slider');
+  if (slider) slider.disabled = _bboxHideAll;
+  drawDetectionBoxes(_lastDetections);
+}
 
 function drawDetectionBoxes(detections) {
-  if (!detections || detections.length === 0) return;
-  _lastDetections = detections;
+  if (detections && detections.length) _lastDetections = detections;
   const previewImg = document.getElementById('preview-img');
   if (!previewImg) return;
 
   // Remove any existing canvas overlay
   const old = document.getElementById('detection-canvas');
   if (old) old.remove();
+
+  // Show the threshold control now that we have detections to filter
+  const thresholdControl = document.getElementById('bbox-threshold-control');
+  if (thresholdControl && _lastDetections.length > 0) thresholdControl.style.display = 'flex';
+
+  // Manual "hide all" wins outright; otherwise nothing to draw if empty
+  if (_bboxHideAll || !_lastDetections.length) return;
+
+  // Filter out detections below the confidence threshold. Detections
+  // without a confidence score (older/simple payloads) are always kept.
+  const detectionsToShow = _lastDetections.filter(det => {
+    const conf = (typeof det.confidence === 'number') ? det.confidence
+               : (typeof det.score === 'number') ? det.score
+               : null;
+    return conf === null || conf >= _bboxThreshold;
+  });
+  if (!detectionsToShow.length) return;
 
   const canvas = document.createElement('canvas');
   canvas.id = 'detection-canvas';
@@ -3234,7 +3284,7 @@ function drawDetectionBoxes(detections) {
   const bgColors = { Platelet: 'rgba(34,211,238,0.18)', RBC: 'rgba(248,113,113,0.12)', WBC: 'rgba(251,191,36,0.12)' };
 
   let plateletIdx = 0;
-  detections.forEach((det, i) => {
+  detectionsToShow.forEach((det, i) => {
     const [x1, y1, x2, y2] = det.bbox;
     const sx1 = offsetX + x1 * scaleX;
     const sy1 = offsetY + y1 * scaleY;
