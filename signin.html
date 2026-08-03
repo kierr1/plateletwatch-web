@@ -653,14 +653,31 @@
     }
   });
 
+  // ── Log every login (for admin traffic monitoring) ──────────────────
+  // Fire-and-forget: never blocks or breaks sign-in if this fails.
+  // Note: for OAuth, this fires whenever checkAndHandleOAuthProfile runs
+  // with a session present (i.e. right after a real sign-in/redirect) —
+  // it does not fire on every random page load because of the
+  // _authHandled guard above.
+  async function logLoginEvent(userId, provider) {
+    try {
+      await _supabase.from('login_events').insert({ user_id: userId, provider: provider || 'email' });
+    } catch (e) {
+      console.warn('login_events insert failed (non-fatal):', e);
+    }
+  }
+
   // ── Check if OAuth user has a profile; if not, show modal ───────────
   async function checkAndHandleOAuthProfile(user) {
     // Only intercept social (OAuth) logins — not email/password
     const provider = user?.app_metadata?.provider;
     if (!provider || provider === 'email') {
+      logLoginEvent(user.id, 'email');
       window.location.href = '/dashboard';
       return;
     }
+
+    logLoginEvent(user.id, provider);
 
     // Check if profile already exists
     const { data: profile, error } = await _supabase
