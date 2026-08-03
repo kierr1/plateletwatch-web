@@ -512,8 +512,8 @@
     <div class="modal-grid-2" style="margin-top:10px;">
       <div class="field" id="mf-age">
         <label>Age</label>
-        <div class="input-wrap"><span class="ico">#</span><input type="number" id="m-age" min="0" max="120" placeholder="e.g. 25"></div>
-        <span class="err-msg">Required</span>
+        <div class="input-wrap"><span class="ico">#</span><input type="text" id="m-age" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="e.g. 25"></div>
+        <span class="err-msg">Enter a valid age (numbers only)</span>
       </div>
       <div class="field" id="mf-sex">
         <label>Sex / Gender</label>
@@ -530,9 +530,10 @@
       </div>
     </div>
     <div class="modal-grid-2">
-      <div class="field">
+      <div class="field" id="mf-contact">
         <label>Contact Number</label>
-        <div class="input-wrap"><span class="ico">📞</span><input type="tel" id="m-contact" placeholder="09XX XXX XXXX"></div>
+        <div class="input-wrap"><span class="ico">📞</span><input type="tel" id="m-contact" placeholder="09XXXXXXXXX" inputmode="numeric" maxlength="11" pattern="[0-9]*"></div>
+        <span class="err-msg">Enter exactly 11 digits, numbers only</span>
       </div>
       <div class="field">
         <label>Birth Date</label>
@@ -617,7 +618,6 @@
     </div>
 
     <div class="modal-actions">
-      <button class="btn-skip" onclick="skipProfile()">Skip for now</button>
       <button class="btn-primary" id="modal-save-btn" onclick="saveOAuthProfile()">
         <span>✅</span> Save & Continue
       </button>
@@ -785,10 +785,21 @@
     document.getElementById('profile-modal').classList.remove('show');
   }
 
-  function skipProfile() {
-    closeProfileModal();
-    window.location.href = '/dashboard';
-  }
+  // ── Digits-only enforcement (Age & Contact) ─────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    const ageInput = document.getElementById('m-age');
+    if (ageInput) {
+      ageInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 3);
+      });
+    }
+    const contactInput = document.getElementById('m-contact');
+    if (contactInput) {
+      contactInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+      });
+    }
+  });
 
   // ── Modal alert ─────────────────────────────────────────────────────
   function showModalAlert(msg, type = 'error') {
@@ -954,11 +965,13 @@
 
     // Validate required fields
     let valid = true;
+    const DIGITS_ONLY = /^[0-9]+$/;
     const reqFields = [
-      { fieldId: 'mf-lname', inputId: 'm-lname',  test: v => v.trim() },
-      { fieldId: 'mf-fname', inputId: 'm-fname',  test: v => v.trim() },
-      { fieldId: 'mf-age',   inputId: 'm-age',    test: v => v && +v > 0 },
-      { fieldId: 'mf-sex',   inputId: 'm-sex',    test: v => v },
+      { fieldId: 'mf-lname',   inputId: 'm-lname',   test: v => v.trim().length > 0 },
+      { fieldId: 'mf-fname',   inputId: 'm-fname',   test: v => v.trim().length > 0 },
+      { fieldId: 'mf-age',     inputId: 'm-age',     test: v => DIGITS_ONLY.test(v.trim()) && +v > 0 && +v <= 120 },
+      { fieldId: 'mf-sex',     inputId: 'm-sex',     test: v => v },
+      { fieldId: 'mf-contact', inputId: 'm-contact', test: v => DIGITS_ONLY.test(v.trim()) && v.trim().length === 11 },
     ];
     reqFields.forEach(f => {
       const el = document.getElementById(f.inputId);
