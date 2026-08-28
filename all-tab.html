@@ -1090,31 +1090,6 @@ body{background-image:none;}
 }
 
 
-/* ── IMAGE ENHANCER ─────────────────────────────────────── */
-#enhancer-panel{display:none;margin-bottom:16px;border-radius:var(--radius-md);overflow:hidden;border:1.5px solid #bae6fd;background:var(--white);}
-#enhancer-header{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;background:#f0f9ff;border-bottom:1.5px solid #bae6fd;}
-#enhancer-score{font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;}
-.enhancer-meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 16px 10px;}
-.e-meter{background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;}
-.e-meter-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
-.e-meter-bar{height:5px;border-radius:100px;background:var(--warm-gray);margin-bottom:5px;overflow:hidden;}
-.e-meter-fill{height:5px;border-radius:100px;width:0%;transition:width .6s ease;}
-.e-meter-val{font-size:11px;font-weight:600;}
-#enhancer-suggestions{padding:0 16px 10px;display:none;}
-.e-chip{display:inline-flex;align-items:center;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;font-family:var(--font-ui);cursor:pointer;margin:3px;transition:background .15s;}
-.e-chip:hover{background:#bae6fd;}
-.enhancer-controls{border-top:1.5px solid #e0f2fe;padding:12px 16px;}
-.e-slider-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.e-slider-label{font-size:11px;font-weight:600;color:var(--text-mid);min-width:68px;}
-.e-slider-row input[type=range]{flex:1;accent-color:#0ea5e9;}
-.e-slider-val{font-size:11px;color:var(--text-muted);min-width:28px;text-align:right;}
-.e-sharpen-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
-.enhancer-btns{display:flex;gap:8px;flex-wrap:wrap;}
-.btn-enhance{display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:var(--r-sm);padding:8px 14px;font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer;transition:background .18s;}
-.btn-enhance:hover{background:#0284c7;}
-.btn-reset-enhance{background:none;border:1.5px solid var(--warm-gray);border-radius:var(--r-sm);padding:8px 14px;font-family:var(--font-ui);font-size:12px;font-weight:600;color:var(--text-mid);cursor:pointer;transition:all .18s;}
-.btn-reset-enhance:hover{border-color:var(--crimson);color:var(--crimson);}
-
 </style>
 </head>
 <body>
@@ -1388,70 +1363,6 @@ body{background-image:none;}
             Hide all boxes
           </label>
         </div>
-
-        <!-- ★ IMAGE QUALITY ENHANCER -->
-        <div id="enhancer-panel">
-          <div id="enhancer-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round"><circle cx="7.5" cy="7.5" r="3"/><path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M3.2 3.2l1 1M10.8 10.8l1 1M3.2 11.8l1-1M10.8 4.2l1-1"/></svg>
-              <span style="font-family:var(--font-display);font-size:13px;font-weight:700;color:#0369a1;">Image Quality Check</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span id="enhancer-score"></span>
-              <button onclick="document.getElementById('enhancer-body').style.display=document.getElementById('enhancer-body').style.display==='none'?'block':'none'" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:16px;line-height:1;">▾</button>
-            </div>
-          </div>
-          <div id="enhancer-body">
-            <div class="enhancer-meters">
-              <div class="e-meter">
-                <div class="e-meter-label">☀ Brightness</div>
-                <div class="e-meter-bar"><div class="e-meter-fill" id="fill-brightness" style="background:#f59e0b;"></div></div>
-                <div class="e-meter-val" id="val-brightness-label"></div>
-              </div>
-              <div class="e-meter">
-                <div class="e-meter-label">◑ Contrast</div>
-                <div class="e-meter-bar"><div class="e-meter-fill" id="fill-contrast" style="background:#8b5cf6;"></div></div>
-                <div class="e-meter-val" id="val-contrast-label"></div>
-              </div>
-              <div class="e-meter">
-                <div class="e-meter-label">◎ Sharpness</div>
-                <div class="e-meter-bar"><div class="e-meter-fill" id="fill-sharpness" style="background:#10b981;"></div></div>
-                <div class="e-meter-val" id="val-sharpness-label"></div>
-              </div>
-            </div>
-            <div id="enhancer-suggestions">
-              <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding:0 16px;">Suggestions</div>
-              <div id="suggestion-chips" style="padding:0 12px 4px;"></div>
-            </div>
-            <div class="enhancer-controls">
-              <div class="e-slider-row">
-                <span class="e-slider-label">Brightness</span>
-                <input type="range" id="adj-brightness" min="-80" max="80" value="0" oninput="previewEnhancement()">
-                <span class="e-slider-val" id="adj-brightness-val">0</span>
-              </div>
-              <div class="e-slider-row">
-                <span class="e-slider-label">Contrast</span>
-                <input type="range" id="adj-contrast" min="-80" max="80" value="0" oninput="previewEnhancement()">
-                <span class="e-slider-val" id="adj-contrast-val">0</span>
-              </div>
-              <div class="e-sharpen-row">
-                <span class="e-slider-label">Sharpen</span>
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-mid);">
-                  <input type="checkbox" id="adj-sharpen" onchange="previewEnhancement()" style="accent-color:#10b981;width:15px;height:15px;">
-                  Apply unsharp mask
-                </label>
-              </div>
-              <div class="enhancer-btns">
-                <button class="btn-enhance" onclick="applyEnhancement()">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"><path d="M2 6l2.5 2.5L10 3"/></svg>
-                  Apply Enhancement
-                </button>
-                <button class="btn-reset-enhance" onclick="resetEnhancement()">Reset Original</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- /IMAGE QUALITY ENHANCER -->
 
         <div class="upload-controls">
           <button class="btn-outline" onclick="document.getElementById('image-file-input').click()" aria-label="Upload image from local device">
@@ -1780,6 +1691,7 @@ body{background-image:none;}
         <svg viewBox="0 0 180 180" fill="none" stroke="rgba(34,211,238,0.6)" stroke-width="1.5"><rect x="10" y="10" width="40" height="40" rx="4"/><rect x="130" y="10" width="40" height="40" rx="4"/><rect x="10" y="130" width="40" height="40" rx="4"/><rect x="130" y="130" width="40" height="40" rx="4"/></svg>
       </div>
       <div class="camera-tag" id="camera-live-tag">● LIVE</div>
+      <div class="camera-tag" id="cam-lock-btn" style="display:none;left:auto;right:12px;color:#22c55e;border-color:rgba(34,197,94,.3);">🔒 Focus Locked</div>
       <div class="camera-err" id="camera-err">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
         <strong id="camera-err-title">Camera Error</strong>
@@ -1791,7 +1703,7 @@ body{background-image:none;}
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 10a6 6 0 0 1 11.6-2M16 10a6 6 0 0 1-11.6 2"/><path d="M17 7l-.4 3.2-3.2-.4M3 13l.4-3.2 3.2.4"/></svg>
         Flip
       </button>
-      <button class="cam-btn-capture" onclick="capturePhoto()" id="cam-capture-btn">
+      <button class="cam-btn-capture" onclick="captureWithDelay(2)" id="cam-capture-btn">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M2 9V7a2 2 0 0 1 2-2h2l2-2h8l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5"/></svg>
       </button>
       <button class="cam-btn-use" onclick="useCapturedPhoto()" id="cam-use-btn" style="display:none;">
@@ -2955,6 +2867,7 @@ async function initCamera() {
     _cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = _cameraStream;
     await video.play();
+    await _lockFocusExposure(_cameraStream);
   } catch(err) {
     let title = 'Camera Access Denied';
     let msg   = 'Please allow camera permission in your browser settings, then tap Retry.';
@@ -2964,6 +2877,38 @@ async function initCamera() {
       try { _cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); video.srcObject = _cameraStream; await video.play(); return; } catch(e2) { msg = e2.message; }
     }
     _showCameraError(title, msg);
+  }
+}
+
+async function _lockFocusExposure(stream) {
+  const lockBtn = document.getElementById('cam-lock-btn');
+  const track = stream.getVideoTracks()[0];
+  if (!track || !track.getCapabilities) {
+    if (lockBtn) lockBtn.style.display = 'none';
+    return;
+  }
+  let caps = {};
+  try { caps = track.getCapabilities(); } catch (_) {}
+  const canFocus    = caps.focusMode && caps.focusMode.includes('manual');
+  const canExposure = caps.exposureMode && caps.exposureMode.includes('manual');
+  if (!canFocus && !canExposure) {
+    // Device doesn't expose programmatic manual lock — hide the badge and
+    // rely on the delayed-shutter capture instead to avoid motion blur.
+    if (lockBtn) lockBtn.style.display = 'none';
+    return;
+  }
+  try {
+    const advanced = [];
+    if (canFocus)    advanced.push({ focusMode: 'manual' });
+    if (canExposure) advanced.push({ exposureMode: 'manual' });
+    await track.applyConstraints({ advanced });
+    if (lockBtn) {
+      lockBtn.style.display = '';
+      lockBtn.textContent = '🔒 Focus Locked';
+      lockBtn.classList.add('locked');
+    }
+  } catch (e) {
+    if (lockBtn) lockBtn.style.display = 'none';
   }
 }
 
@@ -2994,6 +2939,28 @@ function _showCameraLive() {
   retakeBtn.style.display  = 'none';
   liveTag.textContent      = '● LIVE';
   liveTag.style.color      = '#22D3EE';
+}
+
+function captureWithDelay(seconds) {
+  seconds = seconds || 2;
+  const btn = document.getElementById('cam-capture-btn');
+  if (btn.disabled) return; // already counting down
+  let remaining = seconds;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  const tick = () => {
+    if (remaining <= 0) {
+      clearInterval(interval);
+      btn.innerHTML = original;
+      btn.disabled = false;
+      capturePhoto();
+      return;
+    }
+    btn.innerHTML = '<span style="font-size:20px;font-weight:700;color:#0a0d14;">' + remaining + '</span>';
+    remaining--;
+  };
+  tick();
+  const interval = setInterval(tick, 1000);
 }
 
 function capturePhoto() {
@@ -3352,45 +3319,6 @@ async function countPlatelets() {
   if (!_imageCropped) {
     openCropModal(document.getElementById('preview-img').src);
     return;
-  }
-
-  const q = window._imgQualityMetrics;
-  if (q) {
-    // Hard block: an image with almost no variance (std dev near zero) is
-    // essentially a flat, solid color — e.g. fully black, fully white, or a
-    // blank/blown-out frame. No real blood smear photo looks like this, so
-    // there's nothing to analyze — refuse before ever calling the AI model.
-    if (q.stdDev < 4) {
-      showErrorModal(
-        'Image Unusable',
-        'This image has almost no visible detail (it looks blank, black, or a single solid color). This can\'t be a real blood smear photo, so analysis has been cancelled. Please retake the photo through the microscope, making sure the sample and lighting are visible.'
-      );
-      return;
-    }
-    // Soft warning: quality is poor but not literally blank — let the user
-    // decide whether to proceed, since it might still be a real (if bad)
-    // sample photo.
-    if (q.overall < 35) {
-      showConfirm(
-        'Poor Image Quality',
-        'This image scored low on brightness, contrast, and/or sharpness — analysis may be inaccurate or unreliable. Consider applying enhancement or retaking the photo. Continue anyway?',
-        'Analyze Anyway',
-        function() { _runPlateletCount(); }
-      );
-      return;
-    }
-    // Soft warning: the dominant color doesn't look like a stained blood
-    // smear (expected pink/red/purple). Could be a filtered/edited photo,
-    // wrong sample, or unusual lighting — let the user confirm either way.
-    if (q.colorPlausible === false) {
-      showConfirm(
-        'Unusual Coloring Detected',
-        'This image\'s coloring doesn\'t look like a typical stained blood smear (expected pink/red/purple tones). It may be a filtered photo, a different sample, or unusual lighting. Continue anyway?',
-        'Analyze Anyway',
-        function() { _runPlateletCount(); }
-      );
-      return;
-    }
   }
 
   _runPlateletCount();
@@ -4719,253 +4647,6 @@ function toggleDarkMode() {
 })();
 
 
-/* ═══ IMAGE ENHANCER ═══ */
-(function(){
-  var _origData = null;  // original image dataURL
-
-  // Hook into showImagePreview
-  var _origShow = window.showImagePreview;
-  window.showImagePreview = function(file) {
-    _origShow(file);
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      _origData = e.target.result;
-      resetSliders();
-      analyzeImage(_origData);
-      document.getElementById('enhancer-panel').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Hook into clearImage
-  var _origClear = window.clearImage;
-  window.clearImage = function() {
-    if (!window.currentImageFile) { if(_origClear) _origClear(); return; }
-    showConfirm('Clear image?', 'This will remove the current image and unsaved results.', 'Clear', function(){
-      _origData = null;
-      document.getElementById('enhancer-panel').style.display = 'none';
-      if(_origClear) _origClear();
-    });
-  };
-
-  // Analyze
-  function analyzeImage(dataURL) {
-    var img = new Image();
-    img.onload = function() {
-      var W = 200, H = Math.round(img.height * (200 / img.width));
-      var cv = document.createElement('canvas');
-      cv.width = W; cv.height = H;
-      var ctx = cv.getContext('2d');
-      ctx.drawImage(img, 0, 0, W, H);
-      var px = ctx.getImageData(0, 0, W, H).data;
-
-      // Brightness = mean luminance
-      var sumL = 0;
-      for (var i = 0; i < px.length; i += 4)
-        sumL += 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
-      var avgL = sumL / (px.length / 4);
-
-      // Contrast = std dev of luminance
-      var sumV = 0;
-      for (var i = 0; i < px.length; i += 4) {
-        var l = 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
-        sumV += (l - avgL) * (l - avgL);
-      }
-      var stdDev = Math.sqrt(sumV / (px.length / 4));
-
-      // Sharpness = Laplacian variance
-      var gray = [];
-      for (var i = 0; i < px.length; i += 4)
-        gray.push((px[i] + px[i+1] + px[i+2]) / 3);
-      var lSum = 0, lVar = 0, n = 0;
-      for (var y = 1; y < H-1; y++) {
-        for (var x = 1; x < W-1; x++) {
-          var idx = y*W+x;
-          var lap = -gray[idx-W-1]-gray[idx-W]-gray[idx-W+1]-gray[idx-1]+8*gray[idx]-gray[idx+1]-gray[idx+W-1]-gray[idx+W]-gray[idx+W+1];
-          lSum += lap; lVar += lap*lap; n++;
-        }
-      }
-      var sharpScore = Math.sqrt(lVar/n - Math.pow(lSum/n, 2));
-
-      // Average hue — a real stained blood smear under a microscope reads
-      // as pink/red/purple/magenta. If the dominant color is something
-      // wildly different (strong green, blue, cyan, yellow), that's a good
-      // sign the image isn't a real (or unaltered) blood smear photo.
-      var sumR=0, sumG=0, sumB=0;
-      for (var i = 0; i < px.length; i += 4) { sumR += px[i]; sumG += px[i+1]; sumB += px[i+2]; }
-      var n2 = px.length / 4;
-      var avgR = sumR/n2, avgG = sumG/n2, avgB = sumB/n2;
-      var maxC = Math.max(avgR, avgG, avgB), minC = Math.min(avgR, avgG, avgB);
-      var delta = maxC - minC;
-      var hue = 0;
-      if (delta > 1) {
-        if (maxC === avgR)      hue = ((avgG - avgB) / delta) % 6;
-        else if (maxC === avgG) hue = (avgB - avgR) / delta + 2;
-        else                    hue = (avgR - avgG) / delta + 4;
-        hue = hue * 60;
-        if (hue < 0) hue += 360;
-      }
-      var saturation = maxC === 0 ? 0 : delta / maxC;
-      // Plausible stained-smear hues: red/pink/magenta/purple (~270-360 and
-      // 0-30), and only when there's actually enough color saturation to
-      // judge hue meaningfully (near-grayscale images skip this check).
-      var colorPlausible = (saturation < 0.12) || (hue >= 270 || hue <= 30);
-
-      var bPct  = Math.min(100, Math.round((avgL / 255) * 100));
-      var cPct  = Math.min(100, Math.round((stdDev / 80) * 100));
-      var sPct  = Math.min(100, Math.round((sharpScore / 30) * 100));
-
-      // Store metrics globally so countPlatelets() can refuse to analyze
-      // images that are obviously unusable (blank/black/flat) before ever
-      // sending them to the AI model.
-      window._imgQualityMetrics = {
-        avgL: avgL, stdDev: stdDev, sharpScore: sharpScore,
-        bPct: bPct, cPct: cPct, sPct: sPct,
-        hue: hue, saturation: saturation, colorPlausible: colorPlausible,
-        overall: Math.round((bPct + cPct + sPct) / 3)
-      };
-
-      renderMeters(bPct, cPct, sPct);
-      buildSuggestions(bPct, cPct, sPct, avgL, stdDev, sharpScore);
-    };
-    img.src = dataURL;
-  }
-
-  function renderMeters(b, c, s) {
-    function lbl(pct) {
-      if (pct < 30) return {text: 'Too low', color: '#dc2626'};
-      if (pct < 50) return {text: 'Below ideal', color: '#d97706'};
-      if (pct > 85) return {text: 'Too high', color: '#d97706'};
-      return {text: 'Good', color: '#15803d'};
-    }
-    var overall = Math.round((b+c+s)/3);
-    var badge = document.getElementById('enhancer-score');
-    if (overall >= 60) { badge.textContent = 'Good quality ✓'; badge.style.cssText = 'background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;'; }
-    else if (overall >= 35) { badge.textContent = 'Needs improvement'; badge.style.cssText = 'background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;'; }
-    else { badge.textContent = 'Poor quality ⚠'; badge.style.cssText = 'background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;'; }
-
-    [['brightness',b],['contrast',c],['sharpness',s]].forEach(function(pair) {
-      document.getElementById('fill-'+pair[0]).style.width = pair[1]+'%';
-      var l = lbl(pair[1]);
-      var el = document.getElementById('val-'+pair[0]+'-label');
-      el.textContent = pair[1]+'% — '+l.text;
-      el.style.color = l.color;
-    });
-  }
-
-  function buildSuggestions(b, c, s, avgL, stdDev, sharpScore) {
-    var chips = [];
-    if (avgL < 80)   chips.push({label:'☀ Brighten image',    fn: function(){ setSlider('adj-brightness', 40); previewEnhancement(); }});
-    if (avgL > 195)  chips.push({label:'◑ Reduce brightness', fn: function(){ setSlider('adj-brightness',-35); previewEnhancement(); }});
-    if (stdDev < 30) chips.push({label:'◈ Boost contrast',    fn: function(){ setSlider('adj-contrast',   45); previewEnhancement(); }});
-    if (stdDev > 75) chips.push({label:'◈ Reduce contrast',   fn: function(){ setSlider('adj-contrast',  -30); previewEnhancement(); }});
-    if (sharpScore < 10) chips.push({label:'◎ Sharpen image', fn: function(){ document.getElementById('adj-sharpen').checked=true; previewEnhancement(); }});
-    if (avgL < 80 && stdDev < 35) chips.push({label:'✦ Auto-enhance (dim & flat)', fn: function(){ setSlider('adj-brightness',35); setSlider('adj-contrast',40); document.getElementById('adj-sharpen').checked=true; previewEnhancement(); }});
-
-    var box = document.getElementById('enhancer-suggestions');
-    var chipsEl = document.getElementById('suggestion-chips');
-    chipsEl.innerHTML = '';
-    if (chips.length === 0) { box.style.display = 'none'; return; }
-    box.style.display = 'block';
-    chips.forEach(function(chip) {
-      var btn = document.createElement('button');
-      btn.className = 'e-chip';
-      btn.textContent = chip.label;
-      btn.onclick = chip.fn;
-      chipsEl.appendChild(btn);
-    });
-  }
-
-  function setSlider(id, val) {
-    var el = document.getElementById(id);
-    if (el) { el.value = val; document.getElementById(id+'-val').textContent = val > 0 ? '+'+val : val; }
-  }
-
-  window.previewEnhancement = function() {
-    var b = parseInt(document.getElementById('adj-brightness').value);
-    var c = parseInt(document.getElementById('adj-contrast').value);
-    document.getElementById('adj-brightness-val').textContent = b > 0 ? '+'+b : b;
-    document.getElementById('adj-contrast-val').textContent   = c > 0 ? '+'+c : c;
-    var bF = 1 + (b / 200);
-    var cF = 1 + (c / 160);
-    document.getElementById('preview-img').style.filter = 'brightness('+bF+') contrast('+cF+')' + (document.getElementById('adj-sharpen').checked ? ' url(#pw-sharpen)' : '');
-  };
-
-  window.applyEnhancement = function() {
-    if (!_origData) return;
-    var b = parseInt(document.getElementById('adj-brightness').value);
-    var c = parseInt(document.getElementById('adj-contrast').value);
-    var sharp = document.getElementById('adj-sharpen').checked;
-    var img = new Image();
-    img.onload = function() {
-      var cv = document.createElement('canvas');
-      cv.width = img.width; cv.height = img.height;
-      var ctx = cv.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      if (b !== 0 || c !== 0) {
-        var id = ctx.getImageData(0, 0, cv.width, cv.height);
-        var d = id.data;
-        var bA = b * 2.55;
-        var cF = (259*(c+255))/(255*(259-c));
-        for (var i = 0; i < d.length; i += 4) {
-          d[i]   = Math.min(255,Math.max(0, cF*(d[i]  -128)+128+bA));
-          d[i+1] = Math.min(255,Math.max(0, cF*(d[i+1]-128)+128+bA));
-          d[i+2] = Math.min(255,Math.max(0, cF*(d[i+2]-128)+128+bA));
-        }
-        ctx.putImageData(id, 0, 0);
-      }
-      if (sharp) {
-        var src = ctx.getImageData(0,0,cv.width,cv.height);
-        var dst = ctx.createImageData(cv.width,cv.height);
-        var W=cv.width, H=cv.height, s=src.data, o=dst.data;
-        var k=[-1,-1,-1,-1,9,-1,-1,-1,-1];
-        for (var y=1;y<H-1;y++) for (var x=1;x<W-1;x++) {
-          var r=0,g=0,bv=0;
-          for (var ky=-1;ky<=1;ky++) for (var kx=-1;kx<=1;kx++) {
-            var pi=((y+ky)*W+(x+kx))*4, ki=(ky+1)*3+(kx+1);
-            r+=s[pi]*k[ki]; g+=s[pi+1]*k[ki]; bv+=s[pi+2]*k[ki];
-          }
-          var oi=(y*W+x)*4;
-          o[oi]=Math.min(255,Math.max(0,r)); o[oi+1]=Math.min(255,Math.max(0,g)); o[oi+2]=Math.min(255,Math.max(0,bv)); o[oi+3]=s[oi+3];
-        }
-        ctx.putImageData(dst,0,0);
-      }
-      var newURL = cv.toDataURL('image/jpeg', 0.95);
-      var pImg = document.getElementById('preview-img');
-      pImg.style.filter = '';
-      pImg.src = newURL;
-      cv.toBlob(function(blob){
-        window.currentImageFile = new File([blob], window.currentImageFile ? window.currentImageFile.name : 'enhanced.jpg', {type:'image/jpeg'});
-      }, 'image/jpeg', 0.95);
-      showToast('Enhancement applied', 'success', 2000);
-      setTimeout(function(){ analyzeImage(newURL); }, 300);
-    };
-    img.src = _origData;
-  };
-
-  window.resetEnhancement = function() {
-    if (!_origData) return;
-    document.getElementById('preview-img').src = _origData;
-    document.getElementById('preview-img').style.filter = '';
-    resetSliders();
-    analyzeImage(_origData);
-    fetch(_origData).then(function(r){ return r.blob(); }).then(function(blob){
-      window.currentImageFile = new File([blob], window.currentImageFile ? window.currentImageFile.name : 'image.jpg', {type:blob.type});
-    });
-    showToast('Reset to original', 'info', 1800);
-  };
-
-  function resetSliders() {
-    ['adj-brightness','adj-contrast'].forEach(function(id){
-      var el = document.getElementById(id);
-      if (el) { el.value = 0; document.getElementById(id+'-val').textContent = '0'; }
-    });
-    var sh = document.getElementById('adj-sharpen');
-    if (sh) sh.checked = false;
-    var img = document.getElementById('preview-img');
-    if (img) img.style.filter = '';
-  }
-})();
 
 </script>
 </body>
