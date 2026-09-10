@@ -122,7 +122,7 @@ app.get('/api/test', async (req, res) => {
 
 // ── YOLOv8 Image Analysis (local inference server on port 8000) ───────
 // Requires inference_server.py to be running: python inference_server.py
-const INFERENCE_URL = process.env.INFERENCE_URL || 'http://localhost:8000';
+const INFERENCE_URL = process.env.INFERENCE_URL || 'https://plateletwatch-infer.xyz';
 
 // ── Live queue status (so the frontend can show real position/wait time
 // instead of generic "processing..." text during a busy period) ────────
