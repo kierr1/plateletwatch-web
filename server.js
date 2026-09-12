@@ -299,7 +299,7 @@ app.post('/api/chat', aiLimiter, async (req, res) => {
   }
 
   // Groq-hosted free models. Adjust to whatever's current in your Groq console.
-  const safeModel = 'llama-3.3-70b-versatile';
+  const safeModel = 'openai/gpt-oss-120b';
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
