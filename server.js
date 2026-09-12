@@ -27,7 +27,17 @@ async function checkAndConsumeQuota(authHeader) {
   if (!token) return { ok: false, status: 401, error: 'Not signed in.' };
 
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !user) return { ok: false, status: 401, error: 'Invalid or expired session.' };
+  if (authErr || !user) {
+    // TEMPORARY: log the real reason so we can see it in Render's logs.
+    // Remove this console.error once the issue is fixed.
+    console.error('Auth check failed:', authErr?.message || 'no user returned', {
+      hasToken: !!token,
+      tokenLength: token.length,
+      supabaseUrlSet: !!process.env.SUPABASE_URL,
+      serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
+    return { ok: false, status: 401, error: 'Invalid or expired session.' };
+  }
 
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
