@@ -2466,15 +2466,41 @@ async function sendChat() {
   const typingEl = appendMsg('bot', '', true, false);
 
   try {
+    // Send the user's Supabase session token so the server can identify
+    // them and deduct from THEIR daily chat quota (see chat_usage table).
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (!session) {
+      typingEl.querySelector('.chat-bubble').textContent = 'Please sign in to use the chat assistant.';
+      typingEl.classList.remove('typing');
+      document.getElementById('faq-messages').scrollTop = 99999;
+      return;
+    }
+
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({
-        model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...chatHistory],
-        reasoning: { enabled: true }
       })
     });
+
+    if (res.status === 429) {
+      const errData = await res.json().catch(() => ({}));
+      typingEl.querySelector('.chat-bubble').textContent = errData.error || "You've reached your daily chat limit.";
+      typingEl.classList.remove('typing');
+      if (!typingEl.querySelector('.chat-time')) {
+        const t = document.createElement('div');
+        t.className = 'chat-time';
+        t.textContent = nowTime();
+        typingEl.querySelector('.chat-col').appendChild(t);
+      }
+      document.getElementById('faq-messages').scrollTop = 99999;
+      return;
+    }
+
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
     let reply = msg?.content || "I can't answer that right now. Please try again.";
