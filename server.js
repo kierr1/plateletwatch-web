@@ -5,6 +5,87 @@ const path        = require('path');
 const helmet      = require('helmet');
 const rateLimit   = require('express-rate-limit');
 const { exec }    = require('child_process');
+const { createClient } = require('@supabase/supabase-js');
+
+// ── Supabase admin client (SERVICE ROLE key — server-side only, never
+// exposed to the browser). Used to verify logged-in users and to read/
+// write their per-user chat quota. Get this key from:
+// Supabase Dashboard → Project Settings → API → service_role key
+// ────────────────────────────────────────────────────────────────────
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const DEFAULT_DAILY_LIMIT = 30; // messages/day per user if no row exists yet
+
+// Verifies the user's Supabase access token (sent from the frontend as
+// "Authorization: Bearer <token>") and checks/deducts their daily quota.
+// Returns { ok: true, userId } or { ok: false, status, error }.
+async function checkAndConsumeQuota(authHeader) {
+  const token = (authHeader || '').replace(/^Bearer\s+/i, '');
+  if (!token) return { ok: false, status: 401, error: 'Not signed in.' };
+
+  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+  if (authErr || !user) return { ok: false, status: 401, error: 'Invalid or expired session.' };
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  let { data: usage, error: fetchErr } = await supabaseAdmin
+    .from('chat_usage')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, status: 500, error: 'Quota lookup failed.' };
+
+  // No row yet -> create one with defaults
+  if (!usage) {
+    const { data: created, error: insertErr } = await supabaseAdmin
+      .from('chat_usage')
+      .insert({ user_id: user.id, messages_used: 0, daily_limit: DEFAULT_DAILY_LIMIT, last_reset_date: today })
+      .select()
+      .single();
+    if (insertErr) return { ok: false, status: 500, error: 'Could not create quota record.' };
+    usage = created;
+  }
+
+  // Reset counter if it's a new day
+  if (usage.last_reset_date !== today) {
+    usage.messages_used = 0;
+    usage.last_reset_date = today;
+  }
+
+  if (usage.messages_used >= usage.daily_limit) {
+    // Persist the reset even if they're over limit, so tomorrow starts clean
+    await supabaseAdmin.from('chat_usage').update({
+      messages_used: usage.messages_used,
+      last_reset_date: usage.last_reset_date,
+    }).eq('user_id', user.id);
+    return {
+      ok: false,
+      status: 429,
+      error: `You've used all ${usage.daily_limit} chat messages for today. Resets tomorrow.`,
+    };
+  }
+
+  // Consume one message from their quota
+  const { error: updateErr } = await supabaseAdmin
+    .from('chat_usage')
+    .update({
+      messages_used: usage.messages_used + 1,
+      last_reset_date: usage.last_reset_date,
+    })
+    .eq('user_id', user.id);
+
+  if (updateErr) return { ok: false, status: 500, error: 'Could not update quota.' };
+
+  return {
+    ok: true,
+    userId: user.id,
+    remaining: usage.daily_limit - (usage.messages_used + 1),
+  };
+}
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -220,12 +301,21 @@ app.post('/api/analyze-image', aiLimiter, async (req, res) => {
   }
 });
 
-// ── Main Chat Proxy ───────────────────────────────────────────────────
+// ── Main Chat Proxy (Groq, with per-user daily quota) ─────────────────
 app.post('/api/chat', aiLimiter, async (req, res) => {
-  const apiKey = requireApiKey(res);
-  if (!apiKey) return;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) {
+    return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server.' });
+  }
 
-  const { model, messages } = req.body;
+  // Every logged-in user gets their own daily message quota, tracked in
+  // Supabase (see chat_usage_migration.sql). Anonymous requests are rejected.
+  const quota = await checkAndConsumeQuota(req.headers.authorization);
+  if (!quota.ok) {
+    return res.status(quota.status).json({ error: quota.error });
+  }
+
+  const { messages } = req.body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'Invalid messages array.' });
   }
@@ -233,27 +323,22 @@ app.post('/api/chat', aiLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Too many messages in conversation.' });
   }
 
-  const allowedModels = [
-    'deepseek/deepseek-v4-flash:free',
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    'meta-llama/llama-3.1-8b-instruct:free',
-  ];
-  const safeModel = allowedModels.includes(model) ? model : allowedModels[0];
+  // Groq-hosted free models. Adjust to whatever's current in your Groq console.
+  const safeModel = 'llama-3.3-70b-versatile';
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer':  process.env.SITE_URL || 'http://localhost:3000',
-        'X-Title':       'PlateletWatch',
+        'Authorization': `Bearer ${groqKey}`,
       },
-      body: JSON.stringify({ ...req.body, model: safeModel }),
+      body: JSON.stringify({ messages, model: safeModel }),
     });
 
     const data = await response.json();
-    res.status(response.status).json(data);
+    // Let the frontend show a "X messages left today" indicator if you want.
+    res.status(response.status).json({ ...data, _quota_remaining: quota.remaining });
   } catch (err) {
     console.error('Chat error:', err.message);
     res.status(500).json({ error: 'Chat request failed. Please try again.' });
