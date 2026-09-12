@@ -174,6 +174,17 @@ const aiLimiter = rateLimit({
   message: { error: 'AI request limit reached. Please wait before trying again.' },
 });
 
+// Tighter, chat-specific limiter (on top of the per-user daily quota below).
+// This is what stops someone from rapid-firing requests within the same
+// minute to burn through Groq tokens before the daily quota even kicks in.
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'You are sending messages too fast. Please slow down.' },
+});
+
 app.use('/api/', generalLimiter);
 
 // ── YOLOv8 Image Analysis (local inference server on port 8000) ───────
@@ -276,8 +287,15 @@ app.post('/api/analyze-image', aiLimiter, async (req, res) => {
   }
 });
 
+// ── Chat anti-abuse limits ─────────────────────────────────────────────
+// These exist so a single "message" from the daily quota can't be abused
+// to smuggle in huge prompts or trigger huge, expensive completions.
+const MAX_MESSAGE_CHARS  = 2000;   // cap on any single message's content
+const MAX_TOTAL_CHARS    = 8000;   // cap on the whole conversation payload
+const MAX_COMPLETION_TOKENS = 600; // cap on how much the model can generate
+
 // ── Main Chat Proxy (Groq, with per-user daily quota) ─────────────────
-app.post('/api/chat', aiLimiter, async (req, res) => {
+app.post('/api/chat', chatLimiter, async (req, res) => {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) {
     return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server.' });
@@ -298,6 +316,25 @@ app.post('/api/chat', aiLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Too many messages in conversation.' });
   }
 
+  // Reject oversized individual messages and oversized total payloads.
+  // Without this, a single "message" against the daily quota could smuggle
+  // in a novel-length prompt and burn a huge number of Groq tokens.
+  let totalChars = 0;
+  for (const m of messages) {
+    const content = typeof m?.content === 'string' ? m.content : '';
+    if (content.length > MAX_MESSAGE_CHARS) {
+      return res.status(400).json({
+        error: `Message too long. Please keep messages under ${MAX_MESSAGE_CHARS} characters.`,
+      });
+    }
+    totalChars += content.length;
+  }
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return res.status(400).json({
+      error: 'This conversation has gotten too long for one request. Please start a new chat.',
+    });
+  }
+
   // Groq-hosted free models. Adjust to whatever's current in your Groq console.
   const safeModel = 'openai/gpt-oss-120b';
 
@@ -308,7 +345,10 @@ app.post('/api/chat', aiLimiter, async (req, res) => {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${groqKey}`,
       },
-      body: JSON.stringify({ messages, model: safeModel }),
+      // max_tokens caps how long a single reply can be, regardless of how
+      // much the model would otherwise be willing to generate -- this is
+      // the main lever against token-cost abuse.
+      body: JSON.stringify({ messages, model: safeModel, max_tokens: MAX_COMPLETION_TOKENS }),
     });
 
     const data = await response.json();
