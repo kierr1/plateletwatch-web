@@ -176,41 +176,6 @@ const aiLimiter = rateLimit({
 
 app.use('/api/', generalLimiter);
 
-// ── Input validation helper ───────────────────────────────────────────
-function requireApiKey(res) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey || apiKey.includes('YOUR-KEY')) {
-    res.status(500).json({ error: 'OPENROUTER_API_KEY is not configured on the server.' });
-    return null;
-  }
-  return apiKey;
-}
-
-// ── Test route ────────────────────────────────────────────────────────
-app.get('/api/test', async (req, res) => {
-  const apiKey = requireApiKey(res);
-  if (!apiKey) return;
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer':  process.env.SITE_URL || 'http://localhost:3000',
-        'X-Title':       'PlateletWatch',
-      },
-      body: JSON.stringify({
-        model: 'deepseek/deepseek-v4-flash:free',
-        messages: [{ role: 'user', content: 'Say hello in one word.' }],
-      }),
-    });
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ── YOLOv8 Image Analysis (local inference server on port 8000) ───────
 // Requires inference_server.py to be running: python inference_server.py
 const INFERENCE_URL = process.env.INFERENCE_URL || "https://plateletwatch-infer.xyz";
@@ -377,7 +342,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅  PlateletWatch is running!\n`);
   console.log(`   💻  Laptop  →  http://localhost:${PORT}/`);
   console.log(`   📱  Phone   →  http://${lanIp}:${PORT}/`);
-  console.log(`   🔬  AI API  →  http://localhost:${PORT}/api/test\n`);
+  console.log(`   🔬  AI API  →  http://localhost:${PORT}/api/chat\n`);
 
   // ── Cloudflare Tunnel for remote testers ─────────────────────────────
   // Exposes port 3000 publicly so testers outside your WiFi can connect.
