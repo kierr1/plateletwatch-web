@@ -210,6 +210,19 @@
   .bottom-note a { color:var(--red-main); font-weight:600; text-decoration:none; }
   .bottom-note a:hover { text-decoration:underline; }
 
+  /* password strength meter */
+  .pw-meter { display:none; align-items:center; gap:8px; margin-top:6px; }
+  .pw-meter.show { display:flex; }
+  .pw-bars { flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+  .pw-bars span { height:4px; border-radius:4px; background:var(--gray-2); transition:background .25s; }
+  .pw-label { font-size:11px; font-weight:600; min-width:48px; text-align:right; transition:color .25s; }
+  .pw-meter.weak   .pw-bars span:nth-child(1) { background:#ef4444; }
+  .pw-meter.weak   .pw-label { color:#ef4444; }
+  .pw-meter.medium .pw-bars span:nth-child(-n+2) { background:#f59e0b; }
+  .pw-meter.medium .pw-label { color:#d97706; }
+  .pw-meter.strong .pw-bars span { background:#22c55e; }
+  .pw-meter.strong .pw-label { color:#16a34a; }
+
   /* validation */
   .field.error .input-wrap { border-color:var(--red-main); }
   .field .err-msg { font-size:10px; color:var(--red-main); margin-top:3px; display:none; }
@@ -285,37 +298,11 @@
         </div>
       </div>
 
-      <!-- Address line 1 -->
+      <!-- Street / Province -->
       <div class="grid-2">
         <div class="field">
           <label>House No. / Street</label>
           <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7.4 8 2l6 5.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.6 6.6V14h8.8V6.6" stroke-linejoin="round"/></svg></span><input type="text" name="street" placeholder="123 Rizal St."></div>
-        </div>
-        <div class="field" id="f-brgy">
-          <label>Barangay</label>
-          <div class="input-wrap">
-            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 14.4S13 9.8 13 6.2A5 5 0 0 0 3 6.2C3 9.8 8 14.4 8 14.4Z" stroke-linejoin="round"/><circle cx="8" cy="6.2" r="1.7"/></svg></span>
-            <select id="sel-brgy" name="barangay" disabled>
-              <option value="">Select barangay</option>
-            </select>
-            <div class="dd-loading" id="load-brgy"><div class="spinner"></div></div>
-          </div>
-          <span class="err-msg">Select a barangay</span>
-        </div>
-      </div>
-
-      <!-- Province / City -->
-      <div class="grid-2">
-        <div class="field" id="f-city">
-          <label>City / Municipality</label>
-          <div class="input-wrap">
-            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 14.2V6l4-2.4v10.6M9.6 14.2V1.8l4.8 2.4v10"/><path d="M3.6 6.6h0M3.6 9h0M3.6 11.4h0M11.6 5h0M11.6 7.6h0M11.6 10.2h0" stroke-linecap="round" stroke-width="1.8"/></svg></span>
-            <select id="sel-city" name="city" disabled>
-              <option value="">Select city/municipality</option>
-            </select>
-            <div class="dd-loading" id="load-city"><div class="spinner"></div></div>
-          </div>
-          <span class="err-msg">Select a city</span>
         </div>
         <div class="field" id="f-prov">
           <label>Province</label>
@@ -330,12 +317,38 @@
         </div>
       </div>
 
+      <!-- City / Barangay -->
+      <div class="grid-2">
+        <div class="field" id="f-city">
+          <label>City / Municipality</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 14.2V6l4-2.4v10.6M9.6 14.2V1.8l4.8 2.4v10"/><path d="M3.6 6.6h0M3.6 9h0M3.6 11.4h0M11.6 5h0M11.6 7.6h0M11.6 10.2h0" stroke-linecap="round" stroke-width="1.8"/></svg></span>
+            <select id="sel-city" name="city" disabled>
+              <option value="">Select city/municipality</option>
+            </select>
+            <div class="dd-loading" id="load-city"><div class="spinner"></div></div>
+          </div>
+          <span class="err-msg">Select a city</span>
+        </div>
+        <div class="field" id="f-brgy">
+          <label>Barangay</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 14.4S13 9.8 13 6.2A5 5 0 0 0 3 6.2C3 9.8 8 14.4 8 14.4Z" stroke-linejoin="round"/><circle cx="8" cy="6.2" r="1.7"/></svg></span>
+            <select id="sel-brgy" name="barangay" disabled>
+              <option value="">Select barangay</option>
+            </select>
+            <div class="dd-loading" id="load-brgy"><div class="spinner"></div></div>
+          </div>
+          <span class="err-msg">Select a barangay</span>
+        </div>
+      </div>
+
       <!-- Age / Sex / Contact / Birthdate -->
       <div class="grid-2">
         <div class="field" id="f-age">
           <label>Age</label>
-          <div class="input-wrap"><span class="ico">#</span><input type="number" name="age" min="1" max="120" placeholder="e.g. 25" required></div>
-          <span class="err-msg">Please enter a valid age</span>
+          <div class="input-wrap"><span class="ico">#</span><input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="e.g. 25" autocomplete="off" required></div>
+          <span class="err-msg">Enter a valid age (1–99, numbers only)</span>
         </div>
         <div class="field">
           <label>Sex</label>
@@ -352,9 +365,10 @@
       </div>
 
       <div class="grid-2">
-        <div class="field">
+        <div class="field" id="f-contact">
           <label>Contact Number</label>
-          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.4c0-.6.5-1 1-.9l2 .4c.4 0 .8.4.8.8l.2 1.8c0 .4-.1.7-.4.9L5.4 6.4c.8 1.9 2.3 3.4 4.2 4.2l1-1.2c.2-.3.6-.4 1-.4l1.8.2c.4 0 .8.4.8.8l.4 2c.1.5-.3 1-.9 1C7.6 12.9 3.1 8.4 3 2.4Z" stroke-linejoin="round"/></svg></span><input type="tel" name="contact" placeholder="09XX XXX XXXX"></div>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.4c0-.6.5-1 1-.9l2 .4c.4 0 .8.4.8.8l.2 1.8c0 .4-.1.7-.4.9L5.4 6.4c.8 1.9 2.3 3.4 4.2 4.2l1-1.2c.2-.3.6-.4 1-.4l1.8.2c.4 0 .8.4.8.8l.4 2c.1.5-.3 1-.9 1C7.6 12.9 3.1 8.4 3 2.4Z" stroke-linejoin="round"/></svg></span><input type="tel" id="contact" name="contact" inputmode="numeric" pattern="[0-9]*" maxlength="11" placeholder="09XXXXXXXXX" autocomplete="tel"></div>
+          <span class="err-msg">Enter exactly 11 digits, numbers only</span>
         </div>
         <div class="field" id="f-bdate">
           <label>Birth Date</label>
@@ -389,6 +403,10 @@
             <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
             <input type="password" id="pw1" name="password" placeholder="••••••••" required>
             <button type="button" class="toggle-pw" onclick="togglePw('pw1',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+          </div>
+          <div class="pw-meter" id="pw-meter" aria-live="polite">
+            <div class="pw-bars"><span></span><span></span><span></span></div>
+            <span class="pw-label" id="pw-label"></span>
           </div>
           <span class="err-msg">Minimum 8 characters</span>
         </div>
@@ -535,6 +553,48 @@ document.getElementById('sel-city').addEventListener('change', async function() 
 // init
 loadProvinces();
 
+// ── INPUT RESTRICTIONS (Age: max 2 digits, Contact: max 11 digits) ───
+function digitsOnly(el, maxLen) {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g, '').slice(0, maxLen);
+  });
+  el.addEventListener('keydown', e => {
+    // block letters / symbols (allow control keys and shortcuts)
+    if (e.key.length === 1 && !/\d/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+  });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+    const start = el.selectionStart, end = el.selectionEnd;
+    el.value = (el.value.slice(0, start) + t + el.value.slice(end)).slice(0, maxLen);
+  });
+}
+digitsOnly(document.getElementById('age'), 2);
+digitsOnly(document.getElementById('contact'), 11);
+
+// ── PASSWORD STRENGTH METER ──────────────────────────────────────────
+document.getElementById('pw1').addEventListener('input', function() {
+  const v = this.value;
+  const meter = document.getElementById('pw-meter');
+  const label = document.getElementById('pw-label');
+  meter.classList.remove('weak','medium','strong','show');
+  if (!v) { label.textContent = ''; return; }
+
+  const checks = [
+    /[a-z]/.test(v) && /[A-Z]/.test(v),   // upper + lower
+    /\d/.test(v),                          // number
+    /[^A-Za-z0-9]/.test(v),                // symbol
+    v.length >= 12                         // long
+  ].filter(Boolean).length;
+
+  let level = 'weak';
+  if (v.length >= 8 && checks >= 3) level = 'strong';
+  else if (v.length >= 8 && checks >= 2) level = 'medium';
+
+  meter.classList.add('show', level);
+  label.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+});
+
 // ── PASSWORD TOGGLE ──────────────────────────────────────────────────
 function togglePw(id, btn) {
   const el = document.getElementById(id);
@@ -552,7 +612,8 @@ async function handleSubmit(e) {
     { id:'f-fname', el:e.target.fname,    test: v=>v.trim() },
     { id:'f-email', el:e.target.email,    test: v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
     { id:'f-pw',    el:e.target.password, test: v=>v.length>=8 },
-    { id:'f-age',   el:e.target.age,      test: v=>v && +v > 0 && +v <= 120 },
+    { id:'f-age',   el:e.target.age,      test: v=>/^\d{1,2}$/.test(v) && +v > 0 },
+    { id:'f-contact', el:e.target.contact,  test: v=>/^\d{11}$/.test(v) },
   ];
   checks.forEach(c => {
     const ok = c.test(c.el.value);
@@ -631,7 +692,7 @@ async function handleSubmit(e) {
   }
 
   // ── 3. Done ──────────────────────────────────────────────────────────
-  btn.textContent = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.8 8.4 6 11.6l7.2-7.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Account created!';
+  btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.8 8.4 6 11.6l7.2-7.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Account created!';
   showAlert(
     'Account created! Please check your email to confirm your address, then sign in.',
     'success'
