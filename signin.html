@@ -454,12 +454,6 @@
         </svg>
         Google
       </button>
-      <button class="btn-social" onclick="handleOAuth('facebook')" id="btn-fb">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2">
-          <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.313 0 2.686.236 2.686.236v2.971H15.83c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
-        </svg>
-        Facebook
-      </button>
     </div>
 
     <p class="bottom-note">Don't have an account? <a href="/register">Create one now</a></p>
@@ -475,8 +469,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.config.js"></script>
 
-<!-- Facebook SDK removed: replace appId with a real Meta Developer App ID before re-enabling -->
-<!-- <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0&appId=YOUR_REAL_FACEBOOK_APP_ID"></script> -->
 
 <!-- ── OAUTH PROFILE COMPLETION MODAL ── -->
 <div class="modal-overlay" id="profile-modal">
@@ -625,11 +617,6 @@
   </div>
 </div>
 <script>
-  // Facebook OAuth is enabled — make sure it's also turned on in
-  // Supabase Dashboard → Authentication → Providers → Facebook,
-  // with a valid Facebook App ID/Secret from developers.facebook.com,
-  // and this page's URL added to Supabase's allowed Redirect URLs.
-
   // ── Guard: prevent double-redirect from getSession + onAuthStateChange ──
   let _authHandled = false;
 
@@ -644,7 +631,7 @@
 
   // ── Listen for OAuth redirect callback ──────────────────────────────
   // INITIAL_SESSION fires when Supabase exchanges the #access_token fragment
-  // on return from Google/Facebook. SIGNED_IN handles email sign-in.
+  // on return from Google. SIGNED_IN handles email sign-in.
   _supabase.auth.onAuthStateChange(async (event, session) => {
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session) {
       if (_authHandled) return; // already handled by getSession() above
@@ -749,7 +736,7 @@
     }
   }
 
-  // ── OAuth (Google / Facebook) ────────────────────────────────────────
+  // ── OAuth (Google) ────────────────────────────────────────
   async function handleOAuth(provider) {
     // Build a clean, reliable redirect URL back to this exact page
     const redirectTo = window.location.origin + window.location.pathname;
@@ -760,7 +747,6 @@
         redirectTo,
         queryParams: {
           // Google: always show account chooser
-          // Facebook: ignored but harmless
           prompt: 'select_account',
         }
       }
