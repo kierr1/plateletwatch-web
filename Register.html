@@ -536,7 +536,7 @@ document.getElementById('sel-city').addEventListener('change', async function() 
   try {
     const data = await apiGet(`${BASE}/cities-municipalities/${code}/barangays/`);
     const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
-    bSel.innerHTML = '<option value="">Select barangay</option>';
+    bSel.innerHTML = '<option value="">Select Barangay</option>';
     sorted.forEach(b => {
       const o = document.createElement('option');
       o.value = b.code;
