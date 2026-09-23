@@ -271,6 +271,7 @@
   <div class="form-side">
     <button class="back-btn" onclick="history.back()" title="Go back"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.6 3.2 4.4 8l5.2 4.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 
+    <div id="reg-form-wrap">
     <h1 class="form-title">Create your account</h1>
     <p class="form-sub">Fill in the details below to register.</p>
 
@@ -435,6 +436,23 @@
     </form>
 
     <p class="bottom-note">Already have an account? <a href="/signin">Sign in here</a></p>
+    </div><!-- /reg-form-wrap -->
+
+    <!-- VERIFY EMAIL VIEW (shown after successful sign-up) -->
+    <div id="verify-view" style="display:none; text-align:center; padding:24px 4px;">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--red-pale);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="var(--red-main)" stroke-width="1.6"><path d="M3 6.5h18v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Z" stroke-linejoin="round"/><path d="m3.5 6.8 8.5 6.4 8.5-6.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1 class="form-title" style="text-align:center;">Check your email</h1>
+      <p class="form-sub" style="text-align:center; margin-bottom:6px;">We've sent a confirmation link to</p>
+      <p style="font-weight:700; font-size:14px; color:var(--text); margin-bottom:18px;" id="verify-email-text"></p>
+      <p style="font-size:12.5px; color:var(--gray-3); line-height:1.6; margin-bottom:22px;">
+        Click the link in that email to verify your address. Once verified, you can sign in and access your dashboard.
+      </p>
+      <div id="verify-alert" style="display:none; margin-bottom:14px; padding:10px 14px; border-radius:8px; font-size:13px;"></div>
+      <button type="button" class="btn-primary" id="resend-btn" onclick="resendVerification()" style="background:var(--white); color:var(--red-main); border:1.5px solid var(--red-main);">Resend confirmation email</button>
+      <p class="bottom-note" style="margin-top:14px;">Already verified? <a href="/signin">Sign in here</a></p>
+    </div>
   </div>
 </div>
 
@@ -692,13 +710,39 @@ async function handleSubmit(e) {
     }
   }
 
-  // ── 3. Done ──────────────────────────────────────────────────────────
-  btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.8 8.4 6 11.6l7.2-7.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Account created!';
-  showAlert(
-    'Account created! Please check your email to confirm your address, then sign in.',
-    'success'
-  );
-  setTimeout(() => { window.location.href = '/signin'; }, 3000);
+  // ── 3. Done — do NOT log the user in yet. Show the "verify email" view
+  //     instead of redirecting to the dashboard. The account only becomes
+  //     usable once the confirmation link is clicked.
+  _pendingEmail = email;
+  document.getElementById('reg-form-wrap').style.display = 'none';
+  document.getElementById('verify-email-text').textContent = email;
+  document.getElementById('verify-view').style.display = 'block';
+}
+
+// ── RESEND CONFIRMATION EMAIL ────────────────────────────────────────
+let _pendingEmail = '';
+async function resendVerification() {
+  if (!_pendingEmail) return;
+  const btn = document.getElementById('resend-btn');
+  const alertBox = document.getElementById('verify-alert');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  const { error } = await _supabase.auth.resend({
+    type: 'signup',
+    email: _pendingEmail
+  });
+
+  alertBox.style.display = 'block';
+  if (error) {
+    alertBox.style.cssText += 'background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;';
+    alertBox.textContent = error.message;
+  } else {
+    alertBox.style.cssText += 'background:#f0fdf4;border:1px solid #86efac;color:#166534;';
+    alertBox.textContent = 'Confirmation email sent! Please check your inbox (and spam folder).';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Resend confirmation email';
 }
 
 // ── ALERT HELPER ──────────────────────────────────────────────────────
