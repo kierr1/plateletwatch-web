@@ -420,6 +420,7 @@
     <!-- Alert box -->
     <div class="alert alert-error" id="alert-box">
       <span><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.6 14.8 13.6H1.2L8 1.6Z" stroke-linejoin="round"/><path d="M8 6.2V9.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".15" fill="currentColor" stroke="none"/></svg></span><span id="alert-msg">Something went wrong.</span>
+      <button type="button" id="resend-link" onclick="resendConfirmation()" style="display:none;background:none;border:none;padding:0;margin-left:6px;color:inherit;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;">Resend email</button>
     </div>
 
     <div class="field">
@@ -710,14 +711,36 @@
   }
 
   // ── Show alert ──────────────────────────────────────────────────────
-  function showAlert(msg, type = 'error') {
+  function showAlert(msg, type = 'error', showResend = false) {
     const box = document.getElementById('alert-box');
     const txt = document.getElementById('alert-msg');
     box.className = `alert alert-${type} show`;
     txt.textContent = msg;
+    document.getElementById('resend-link').style.display = showResend ? 'inline' : 'none';
   }
   function hideAlert() {
     document.getElementById('alert-box').classList.remove('show');
+    document.getElementById('resend-link').style.display = 'none';
+  }
+
+  // ── Resend confirmation email ─────────────────────────────────────────
+  let _lastAttemptedEmail = '';
+  async function resendConfirmation() {
+    const link = document.getElementById('resend-link');
+    if (!_lastAttemptedEmail) return;
+    link.textContent = 'Sending…';
+    link.disabled = true;
+    const { error } = await _supabase.auth.resend({
+      type: 'signup',
+      email: _lastAttemptedEmail
+    });
+    if (error) {
+      showAlert(error.message, 'error', true);
+      link.textContent = 'Resend email';
+      link.disabled = false;
+    } else {
+      showAlert('Confirmation email sent! Please check your inbox (and spam folder).', 'info', false);
+    }
   }
 
   // ── Idle auto-logout notice ──────────────────────────────────────────
@@ -742,13 +765,21 @@
       return;
     }
 
+    _lastAttemptedEmail = email;
     btn.disabled = true;
     btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.6 1.6h8.8M3.6 14.4h8.8M4.4 1.6v2.2c0 1.6 1.2 2.9 3.6 4.2 2.4 1.3 3.6 2.6 3.6 4.2v2.2M11.6 1.6v2.2c0 1.6-1.2 2.9-3.6 4.2-2.4 1.3-3.6 2.6-3.6 4.2v2.2" stroke-linejoin="round"/></svg></span> Signing in…';
 
     const { error } = await _supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      showAlert(error.message);
+      // Supabase returns this specific message when the account exists
+      // but the email address hasn't been confirmed yet.
+      const isUnconfirmed = /email not confirmed/i.test(error.message || '') || error.code === 'email_not_confirmed';
+      if (isUnconfirmed) {
+        showAlert('Please verify your email address before signing in. Check your inbox for the confirmation link.', 'error', true);
+      } else {
+        showAlert(error.message);
+      }
       btn.disabled = false;
       btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.4v11.2L13.5 8 4 2.4Z"/></svg></span> Sign in';
     } else {
