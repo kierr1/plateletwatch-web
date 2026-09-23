@@ -179,6 +179,13 @@
     padding:0 12px; color:var(--gray-3); font-size:15px; transition: color .2s;
   }
   .toggle-pw:hover { color:var(--red-main); }
+  .toggle-pw svg { display:block; transform-origin:center; }
+  .toggle-pw.eye-animate svg { animation: eyeToggle .38s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes eyeToggle {
+    0%   { transform:scale(1)   rotate(0deg); opacity:1; }
+    40%  { transform:scale(.55) rotate(8deg); opacity:.35; }
+    100% { transform:scale(1)   rotate(0deg); opacity:1; }
+  }
 
   .row-check {
     display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
@@ -428,7 +435,7 @@
       <div class="input-wrap">
         <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
         <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
-        <button class="toggle-pw" onclick="togglePw()" type="button"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+        <button class="toggle-pw" onclick="togglePw(this)" type="button"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
       </div>
     </div>
 
@@ -440,7 +447,7 @@
     </div>
 
     <button class="btn-primary" id="signin-btn" onclick="handleSignIn()">
-      <span><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.4v11.2L13.5 8 4 2.4Z"/></svg></span> Sign in
+      Sign in
     </button>
 
     <div class="divider">or continue with</div>
@@ -506,14 +513,14 @@
       <div class="field" id="mf-age">
         <label>Age</label>
         <div class="input-wrap"><span class="ico">#</span><input type="text" id="m-age" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="e.g. 25"></div>
-        <span class="err-msg">Enter a valid age (numbers only)</span>
+        <span class="err-msg">Enter a Valid Age (numbers only)</span>
       </div>
       <div class="field" id="mf-sex">
         <label>Sex / Gender</label>
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.4" cy="6.4" r="3.6"/><path d="M9 3.6 13.4 -.8M13.4 -.8H10M13.4 -.8v3.4" stroke-linecap="round" stroke-linejoin="round" transform="translate(0,2)"/></svg></span>
           <select id="m-sex">
-            <option value="">Select sex</option>
+            <option value="">Sex</option>
             <option>Male</option>
             <option>Female</option>
             <option>Prefer not to say</option>
@@ -557,7 +564,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m1.6 3 4-1.4 4.8 1.4 4-1.4v11.4l-4 1.4-4.8-1.4-4 1.4V3Z" stroke-linejoin="round"/><path d="M5.6 1.8v11.2M10.4 3.2v11.2"/></svg></span>
           <select id="m-sel-prov">
-            <option value="">Loading provinces…</option>
+            <option value="">Loading Provinces…</option>
           </select>
           <div class="dd-loading" id="m-load-prov"><div class="spinner"></div></div>
         </div>
@@ -569,7 +576,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 14.2V6l4-2.4v10.6M9.6 14.2V1.8l4.8 2.4v10"/><path d="M3.6 6.6h0M3.6 9h0M3.6 11.4h0M11.6 5h0M11.6 7.6h0M11.6 10.2h0" stroke-linecap="round" stroke-width="1.8"/></svg></span>
           <select id="m-sel-city" disabled>
-            <option value="">Select city/municipality</option>
+            <option value="">Select City/Municipality</option>
           </select>
           <div class="dd-loading" id="m-load-city"><div class="spinner"></div></div>
         </div>
@@ -579,7 +586,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 14.4S13 9.8 13 6.2A5 5 0 0 0 3 6.2C3 9.8 8 14.4 8 14.4Z" stroke-linejoin="round"/><circle cx="8" cy="6.2" r="1.7"/></svg></span>
           <select id="m-sel-brgy" disabled>
-            <option value="">Select barangay</option>
+            <option value="">Select Barangay</option>
           </select>
           <div class="dd-loading" id="m-load-brgy"><div class="spinner"></div></div>
         </div>
@@ -594,7 +601,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
           <input type="password" id="m-pw1" placeholder="••••••••">
-          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw1')"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw1', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
         </div>
         <div class="pw-strength"><div class="pw-strength-bar" id="m-pw-bar"></div></div>
         <span class="err-msg">Minimum 8 characters</span>
@@ -604,7 +611,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
           <input type="password" id="m-pw2" placeholder="••••••••">
-          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw2')"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw2', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
         </div>
         <span class="err-msg">Passwords do not match</span>
       </div>
@@ -684,9 +691,22 @@
   }
 
   // ── Password toggle ─────────────────────────────────────────────────
-  function togglePw() {
+  const EYE_OPEN  = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg>';
+  const EYE_CLOSED = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/><line x1="2" y1="2" x2="14" y2="14" stroke-linecap="round"/></svg>';
+
+  function animateEyeToggle(btn, showing) {
+    btn.innerHTML = showing ? EYE_CLOSED : EYE_OPEN;
+    btn.classList.remove('eye-animate');
+    // force reflow so the animation can restart
+    void btn.offsetWidth;
+    btn.classList.add('eye-animate');
+  }
+
+  function togglePw(btn) {
     const pw = document.getElementById('pw');
-    pw.type = pw.type === 'password' ? 'text' : 'password';
+    const showing = pw.type === 'password';
+    pw.type = showing ? 'text' : 'password';
+    animateEyeToggle(btn || event.currentTarget, showing);
   }
 
   // ── Show alert ──────────────────────────────────────────────────────
@@ -818,9 +838,11 @@
   }
 
   // ── Modal password toggle ───────────────────────────────────────────
-  function mTogglePw(id) {
+  function mTogglePw(id, btn) {
     const el = document.getElementById(id);
-    el.type = el.type === 'password' ? 'text' : 'password';
+    const showing = el.type === 'password';
+    el.type = showing ? 'text' : 'password';
+    animateEyeToggle(btn || event.currentTarget, showing);
   }
 
   // Password strength indicator
@@ -904,13 +926,13 @@
     try {
       const data = await psgcGet(`${PSGC_BASE}/provinces/`);
       const sorted = data.sort((a,b) => a.name.localeCompare(b.name));
-      pSel.innerHTML = '<option value="">Select province</option>';
+      pSel.innerHTML = '<option value="">Select Province</option>';
       sorted.forEach(p => {
         const o = document.createElement('option');
         o.value = p.code; o.textContent = p.name; pSel.appendChild(o);
       });
     } catch(e) {
-      pSel.innerHTML = '<option value="">Could not load provinces</option>';
+      pSel.innerHTML = '<option value="">Could not load Provinces</option>';
     } finally {
       mLoading('prov', false);
     }
@@ -921,13 +943,13 @@
       const code = this.value;
       const cSel = document.getElementById('m-sel-city');
       mClearSelect(cSel, 'Loading cities…', true);
-      mClearSelect(document.getElementById('m-sel-brgy'), 'Select barangay', true);
-      if (!code) { mClearSelect(cSel, 'Select city/municipality', true); return; }
+      mClearSelect(document.getElementById('m-sel-brgy'), 'Select Barangay', true);
+      if (!code) { mClearSelect(cSel, 'Select City/Municipality', true); return; }
       mLoading('city', true);
       try {
         const data = await psgcGet(`${PSGC_BASE}/provinces/${code}/cities-municipalities/`);
         const sorted = data.sort((a,b) => a.name.localeCompare(b.name));
-        cSel.innerHTML = '<option value="">Select city/municipality</option>';
+        cSel.innerHTML = '<option value="">Select City/Municipality</option>';
         sorted.forEach(c => {
           const o = document.createElement('option');
           o.value = c.code; o.textContent = c.name; cSel.appendChild(o);
@@ -944,19 +966,19 @@
       const code = this.value;
       const bSel = document.getElementById('m-sel-brgy');
       mClearSelect(bSel, 'Loading barangays…', true);
-      if (!code) { mClearSelect(bSel, 'Select barangay', true); return; }
+      if (!code) { mClearSelect(bSel, 'Select Barangay', true); return; }
       mLoading('brgy', true);
       try {
         const data = await psgcGet(`${PSGC_BASE}/cities-municipalities/${code}/barangays/`);
         const sorted = data.sort((a,b) => a.name.localeCompare(b.name));
-        bSel.innerHTML = '<option value="">Select barangay</option>';
+        bSel.innerHTML = '<option value="">Select Barangay</option>';
         sorted.forEach(b => {
           const o = document.createElement('option');
           o.value = b.code; o.textContent = b.name; bSel.appendChild(o);
         });
         bSel.disabled = false;
       } catch(e) {
-        bSel.innerHTML = '<option value="">Could not load barangays</option>';
+        bSel.innerHTML = '<option value="">Could not load Barangays</option>';
       } finally {
         mLoading('brgy', false);
       }
