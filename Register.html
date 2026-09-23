@@ -356,7 +356,7 @@
           <div class="input-wrap">
             <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.4" cy="8.4" r="3.6"/><path d="M9 5.6 13.4 1.2M13.4 1.2H10M13.4 1.2v3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <select name="sex">
-              <option value="">Select Sex</option>
+              <option value="">Sex</option>
               <option>Male</option>
               <option>Female</option>
               <option>Prefer not to say</option>
@@ -488,7 +488,7 @@ async function loadProvinces() {
   try {
     const data = await apiGet(`${BASE}/provinces/`);
     const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
-    pSel.innerHTML = '<option value="">Select province</option>';
+    pSel.innerHTML = '<option value="">Select Province</option>';
     sorted.forEach(p => {
       const o = document.createElement('option');
       o.value = p.code;
@@ -506,8 +506,8 @@ document.getElementById('sel-prov').addEventListener('change', async function() 
   const code = this.value;
   const cSel = document.getElementById('sel-city');
   clearSelect(cSel, 'Loading cities…', true);
-  clearSelect(document.getElementById('sel-brgy'), 'Select barangay', true);
-  if(!code) { clearSelect(cSel,'Select city/municipality',true); return; }
+  clearSelect(document.getElementById('sel-brgy'), 'Select Barangay', true);
+  if(!code) { clearSelect(cSel,'Select City/Municipality',true); return; }
   loading('city', true);
   try {
     const data = await apiGet(`${BASE}/provinces/${code}/cities-municipalities/`);
