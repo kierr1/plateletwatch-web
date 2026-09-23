@@ -767,7 +767,7 @@
 
     _lastAttemptedEmail = email;
     btn.disabled = true;
-    btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.6 1.6h8.8M3.6 14.4h8.8M4.4 1.6v2.2c0 1.6 1.2 2.9 3.6 4.2 2.4 1.3 3.6 2.6 3.6 4.2v2.2M11.6 1.6v2.2c0 1.6-1.2 2.9-3.6 4.2-2.4 1.3-3.6 2.6-3.6 4.2v2.2" stroke-linejoin="round"/></svg></span> Signing in…';
+    btn.textContent = 'Signing in…';
 
     const { error } = await _supabase.auth.signInWithPassword({ email, password });
 
@@ -781,9 +781,9 @@
         showAlert(error.message);
       }
       btn.disabled = false;
-      btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.4v11.2L13.5 8 4 2.4Z"/></svg></span> Sign in';
+      btn.textContent = 'Sign in';
     } else {
-      btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.8 8.4 6 11.6l7.2-7.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Redirecting…';
+      btn.textContent = 'Redirecting…';
       window.location.href = '/dashboard';
     }
   }
