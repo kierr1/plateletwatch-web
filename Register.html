@@ -512,7 +512,7 @@ document.getElementById('sel-prov').addEventListener('change', async function() 
   try {
     const data = await apiGet(`${BASE}/provinces/${code}/cities-municipalities/`);
     const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
-    cSel.innerHTML = '<option value="">Select city/municipality</option>';
+    cSel.innerHTML = '<option value="">Select City/Municipality</option>';
     sorted.forEach(c => {
       const o = document.createElement('option');
       o.value = c.code;
@@ -531,7 +531,7 @@ document.getElementById('sel-city').addEventListener('change', async function() 
   const code = this.value;
   const bSel = document.getElementById('sel-brgy');
   clearSelect(bSel, 'Loading barangays…', true);
-  if(!code) { clearSelect(bSel,'Select barangay',true); return; }
+  if(!code) { clearSelect(bSel,'Select Barangay',true); return; }
   loading('brgy', true);
   try {
     const data = await apiGet(`${BASE}/cities-municipalities/${code}/barangays/`);
