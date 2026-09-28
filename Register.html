@@ -173,6 +173,20 @@
     transition: color .2s;
   }
   .toggle-pw:hover { color:var(--red-main); }
+  .toggle-pw svg { overflow:visible; transition: transform .15s var(--ease-out); }
+  .toggle-pw:active svg { transform:scale(.85); }
+  .toggle-pw:focus { outline:none; }
+  .toggle-pw:focus-visible { outline:2px solid var(--red-main); outline-offset:-2px; border-radius:6px; }
+  .eye-slash {
+    stroke-dasharray:16; stroke-dashoffset:16;
+    transition: stroke-dashoffset .3s var(--ease-out);
+  }
+  .toggle-pw.revealed { color:var(--red-main); }
+  .toggle-pw.revealed .eye-slash { stroke-dashoffset:0; }
+  .eye-shape, .eye-pupil { transform-origin:8px 8px; }
+  @keyframes eyeBlink { 0%{transform:scaleY(1);} 50%{transform:scaleY(.1);} 100%{transform:scaleY(1);} }
+  .toggle-pw.blink .eye-shape, .toggle-pw.blink .eye-pupil { animation: eyeBlink .3s ease; }
+  .btn-primary:disabled { opacity:.7; cursor:not-allowed; transform:none; box-shadow:var(--shadow-sm); }
 
   /* loading spinner for dropdowns */
   .dd-loading { display:none; padding:0 10px; }
@@ -286,17 +300,17 @@
       <div class="grid-3">
         <div class="field" id="f-lname">
           <label>Last Name</label>
-          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" name="lname" placeholder="dela Cruz" required></div>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="lname" name="lname" placeholder="dela Cruz" required></div>
           <span class="err-msg">Required</span>
         </div>
         <div class="field" id="f-fname">
           <label>First Name</label>
-          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" name="fname" placeholder="Juan" required></div>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="fname" name="fname" placeholder="Juan" required></div>
           <span class="err-msg">Required</span>
         </div>
         <div class="field">
           <label>Middle Name</label>
-          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" name="mname" placeholder="Santos"></div>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="mname" name="mname" placeholder="Santos"></div>
         </div>
       </div>
 
@@ -404,7 +418,7 @@
           <div class="input-wrap">
             <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
             <input type="password" id="pw1" name="password" placeholder="••••••••" required>
-            <button type="button" class="toggle-pw" onclick="togglePw('pw1',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+            <button type="button" class="toggle-pw" onclick="togglePw('pw1',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
           </div>
           <div class="pw-meter" id="pw-meter" aria-live="polite">
             <div class="pw-bars"><span></span><span></span><span></span></div>
@@ -417,7 +431,7 @@
           <div class="input-wrap">
             <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
             <input type="password" id="pw2" name="confirm_password" placeholder="••••••••" required>
-            <button type="button" class="toggle-pw" onclick="togglePw('pw2',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+            <button type="button" class="toggle-pw" onclick="togglePw('pw2',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
           </div>
           <span class="err-msg">Passwords do not match</span>
         </div>
@@ -591,6 +605,23 @@ function digitsOnly(el, maxLen) {
 digitsOnly(document.getElementById('age'), 2);
 digitsOnly(document.getElementById('contact'), 11);
 
+// ── NAME FIELDS: no numbers (letters, spaces, . ' - only) ─────────────
+function lettersOnly(el) {
+  const bad = /[^\p{L}\s.'’\-]/gu;
+  el.addEventListener('input', () => { el.value = el.value.replace(bad, ''); });
+  el.addEventListener('keydown', e => {
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && /[^\p{L}\s.'’\-]/u.test(e.key)) e.preventDefault();
+  });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text').replace(bad, '');
+    const start = el.selectionStart, end = el.selectionEnd;
+    el.value = el.value.slice(0, start) + t + el.value.slice(end);
+    el.setSelectionRange(start + t.length, start + t.length);
+  });
+}
+['lname','fname','mname'].forEach(id => lettersOnly(document.getElementById(id)));
+
 // ── PASSWORD STRENGTH METER ──────────────────────────────────────────
 document.getElementById('pw1').addEventListener('input', function() {
   const v = this.value;
@@ -617,7 +648,12 @@ document.getElementById('pw1').addEventListener('input', function() {
 // ── PASSWORD TOGGLE ──────────────────────────────────────────────────
 function togglePw(id, btn) {
   const el = document.getElementById(id);
-  el.type = el.type === 'password' ? 'text' : 'password';
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.classList.toggle('revealed', show);
+  btn.classList.remove('blink');
+  void btn.offsetWidth;
+  btn.classList.add('blink');
 }
 
 // ── FORM SUBMIT ───────────────────────────────────────────────────────
