@@ -656,7 +656,7 @@ async function handleSubmit(e) {
   // Disable button and show loading state
   const btn = document.querySelector('.btn-primary[type=submit]');
   btn.disabled = true;
-  btn.textContent = '⏳ Creating account…';
+  btn.textContent = 'Creating account…';
 
   const form   = e.target;
   const email  = form.email.value.trim();
