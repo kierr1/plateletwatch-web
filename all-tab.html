@@ -1388,7 +1388,7 @@ body{background-image:none;}
             </button>
             <button class="btn-solid" id="btn-count-platelets" onclick="countPlatelets()" aria-label="Run AI platelet count on uploaded image">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="white" stroke-width="1.3"/></svg>
-              Count platelets
+              Count Platelets
             </button>
           </div>
         </div>
@@ -3050,7 +3050,7 @@ const SPINNER_BTN = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"
   <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,.35)" stroke-width="1.3"/>
   <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="white" stroke-width="1.3" stroke-linecap="round"/>
 </svg> Analyzing…`;
-const COUNT_BTN_IDLE = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="white" stroke-width="1.3"/></svg> Count platelets`;
+const COUNT_BTN_IDLE = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="white" stroke-width="1.3"/></svg> Count Platelets`;
 
 if (!document.getElementById('spin-style')) {
   const s = document.createElement('style');
@@ -3533,7 +3533,7 @@ function resetFieldSession() {
 function addCurrentImageAsField() {
   // Use the last single-image analysis result stored in currentAnalysisResult
   if (!currentAnalysisResult) {
-    showErrorModal('No Analysis Yet', 'Please run "Count platelets" on this field first, then click "Add as Field".');
+    showErrorModal('No Analysis Yet', 'Please run "Count Platelets" on this field first, then click "Add as Field".');
     return;
   }
   if (_fieldData.length >= 10) {
