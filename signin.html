@@ -179,13 +179,19 @@
     padding:0 12px; color:var(--gray-3); font-size:15px; transition: color .2s;
   }
   .toggle-pw:hover { color:var(--red-main); }
-  .toggle-pw svg { display:block; transform-origin:center; }
-  .toggle-pw.eye-animate svg { animation: eyeToggle .38s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes eyeToggle {
-    0%   { transform:scale(1)   rotate(0deg); opacity:1; }
-    40%  { transform:scale(.55) rotate(8deg); opacity:.35; }
-    100% { transform:scale(1)   rotate(0deg); opacity:1; }
+  .toggle-pw svg { display:block; overflow:visible; transition: transform .15s var(--ease-out); }
+  .toggle-pw:active svg { transform:scale(.85); }
+  .toggle-pw:focus { outline:none; }
+  .toggle-pw:focus-visible { outline:2px solid var(--red-main); outline-offset:-2px; border-radius:6px; }
+  .eye-slash {
+    stroke-dasharray:16; stroke-dashoffset:16;
+    transition: stroke-dashoffset .3s var(--ease-out);
   }
+  .toggle-pw.revealed { color:var(--red-main); }
+  .toggle-pw.revealed .eye-slash { stroke-dashoffset:0; }
+  .eye-shape, .eye-pupil { transform-origin:8px 8px; }
+  @keyframes eyeBlink { 0%{transform:scaleY(1);} 50%{transform:scaleY(.1);} 100%{transform:scaleY(1);} }
+  .toggle-pw.blink .eye-shape, .toggle-pw.blink .eye-pupil { animation: eyeBlink .3s ease; }
 
   .row-check {
     display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
@@ -436,7 +442,7 @@
       <div class="input-wrap">
         <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
         <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
-        <button class="toggle-pw" onclick="togglePw(this)" type="button"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+        <button class="toggle-pw" onclick="togglePw(this)" type="button"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
       </div>
     </div>
 
@@ -602,7 +608,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
           <input type="password" id="m-pw1" placeholder="••••••••">
-          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw1', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw1', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
         </div>
         <div class="pw-strength"><div class="pw-strength-bar" id="m-pw-bar"></div></div>
         <span class="err-msg">Minimum 8 characters</span>
@@ -612,7 +618,7 @@
         <div class="input-wrap">
           <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
           <input type="password" id="m-pw2" placeholder="••••••••">
-          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw2', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg></button>
+          <button type="button" class="toggle-pw" onclick="mTogglePw('m-pw2', this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
         </div>
         <span class="err-msg">Passwords do not match</span>
       </div>
@@ -692,15 +698,12 @@
   }
 
   // ── Password toggle ─────────────────────────────────────────────────
-  const EYE_OPEN  = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/></svg>';
-  const EYE_CLOSED = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/><line x1="2" y1="2" x2="14" y2="14" stroke-linecap="round"/></svg>';
 
   function animateEyeToggle(btn, showing) {
-    btn.innerHTML = showing ? EYE_CLOSED : EYE_OPEN;
-    btn.classList.remove('eye-animate');
-    // force reflow so the animation can restart
-    void btn.offsetWidth;
-    btn.classList.add('eye-animate');
+    btn.classList.toggle('revealed', showing);
+    btn.classList.remove('blink');
+    void btn.offsetWidth; // restart animation
+    btn.classList.add('blink');
   }
 
   function togglePw(btn) {
@@ -868,6 +871,26 @@
     document.getElementById('modal-alert').classList.remove('show');
   }
 
+
+  // ── Name fields: no numbers (letters, spaces, . ' - only) ────────────
+  function lettersOnly(el) {
+    const bad = /[^\p{L}\s.'’\-]/gu;
+    el.addEventListener('input', () => { el.value = el.value.replace(bad, ''); });
+    el.addEventListener('keydown', e => {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && /[^\p{L}\s.'’\-]/u.test(e.key)) e.preventDefault();
+    });
+    el.addEventListener('paste', e => {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text').replace(bad, '');
+      const start = el.selectionStart, end = el.selectionEnd;
+      el.value = el.value.slice(0, start) + t + el.value.slice(end);
+      el.setSelectionRange(start + t.length, start + t.length);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    ['m-lname','m-fname','m-mname'].forEach(id => { const el = document.getElementById(id); if (el) lettersOnly(el); });
+  });
+
   // ── Modal password toggle ───────────────────────────────────────────
   function mTogglePw(id, btn) {
     const el = document.getElementById(id);
@@ -1023,9 +1046,11 @@
     // Validate required fields
     let valid = true;
     const DIGITS_ONLY = /^[0-9]+$/;
+    const NAME_OK = /^[\p{L}\s.'’\-]+$/u;
     const reqFields = [
-      { fieldId: 'mf-lname',   inputId: 'm-lname',   test: v => v.trim().length > 0 },
-      { fieldId: 'mf-fname',   inputId: 'm-fname',   test: v => v.trim().length > 0 },
+      { fieldId: 'mf-lname',   inputId: 'm-lname',   test: v => v.trim().length > 0 && NAME_OK.test(v.trim()) },
+      { fieldId: 'mf-fname',   inputId: 'm-fname',   test: v => v.trim().length > 0 && NAME_OK.test(v.trim()) },
+      { fieldId: null, inputId: 'm-mname', test: v => !v.trim() || NAME_OK.test(v.trim()) },
       { fieldId: 'mf-age',     inputId: 'm-age',     test: v => DIGITS_ONLY.test(v.trim()) && +v > 0 && +v <= 120 },
       { fieldId: 'mf-sex',     inputId: 'm-sex',     test: v => v },
       { fieldId: 'mf-contact', inputId: 'm-contact', test: v => DIGITS_ONLY.test(v.trim()) && v.trim().length === 11 },
@@ -1033,7 +1058,7 @@
     reqFields.forEach(f => {
       const el = document.getElementById(f.inputId);
       const ok = f.test(el.value);
-      document.getElementById(f.fieldId).classList.toggle('error', !ok);
+      if (f.fieldId) document.getElementById(f.fieldId).classList.toggle('error', !ok);
       if (!ok) valid = false;
     });
 
