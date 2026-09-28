@@ -519,7 +519,7 @@
     <div class="modal-grid-2" style="margin-top:10px;">
       <div class="field" id="mf-age">
         <label>Age</label>
-        <div class="input-wrap"><span class="ico">#</span><input type="text" id="m-age" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="e.g. 25"></div>
+        <div class="input-wrap"><span class="ico">#</span><input type="text" id="m-age" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="e.g. 25"></div>
         <span class="err-msg">Enter a Valid Age (numbers only)</span>
       </div>
       <div class="field" id="mf-sex">
@@ -848,7 +848,7 @@
     const ageInput = document.getElementById('m-age');
     if (ageInput) {
       ageInput.addEventListener('input', function() {
-        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 3);
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 2);
       });
     }
     const contactInput = document.getElementById('m-contact');
@@ -1051,7 +1051,7 @@
       { fieldId: 'mf-lname',   inputId: 'm-lname',   test: v => v.trim().length > 0 && NAME_OK.test(v.trim()) },
       { fieldId: 'mf-fname',   inputId: 'm-fname',   test: v => v.trim().length > 0 && NAME_OK.test(v.trim()) },
       { fieldId: null, inputId: 'm-mname', test: v => !v.trim() || NAME_OK.test(v.trim()) },
-      { fieldId: 'mf-age',     inputId: 'm-age',     test: v => DIGITS_ONLY.test(v.trim()) && +v > 0 && +v <= 120 },
+      { fieldId: 'mf-age',     inputId: 'm-age',     test: v => DIGITS_ONLY.test(v.trim()) && +v > 0 && +v <= 99 },
       { fieldId: 'mf-sex',     inputId: 'm-sex',     test: v => v },
       { fieldId: 'mf-contact', inputId: 'm-contact', test: v => DIGITS_ONLY.test(v.trim()) && v.trim().length === 11 },
     ];
