@@ -1635,16 +1635,10 @@ body{background-image:none;}
       </div>
 
       <div id="export-choice-card" style="background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:18px 22px;margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Choose what to download</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-          <label class="dl-opt"><input type="radio" name="export-choice" value="pdf" checked onchange="setExportChoice(this.value)"><span>PDF report</span></label>
-          <label class="dl-opt"><input type="radio" name="export-choice" value="image" onchange="setExportChoice(this.value)"><span>Annotated image</span></label>
-          <label class="dl-opt"><input type="radio" name="export-choice" value="both" onchange="setExportChoice(this.value)"><span>Both</span></label>
-        </div>
-        <button class="btn-primary-sm" id="btn-export-selected" onclick="runSelectedExport()">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5V11H11V9.5M6.5 2V9M4.5 7L6.5 9L8.5 7"/></svg>
-          Download selected
-        </button>
+        <label class="field-label" for="export-patient-select" style="display:block;margin-bottom:8px;">Select patient to export</label>
+        <select class="field-input" id="export-patient-select" onchange="onExportPatientChange()" style="width:100%;max-width:100%;box-sizing:border-box;cursor:pointer;"></select>
+        <div id="export-patient-meta" style="font-size:12px;line-height:1.6;color:var(--text-muted);margin-top:10px;"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">The PDF report and annotated image below will be generated for the selected patient.</div>
       </div>
 
       <div class="export-grid">
@@ -2726,6 +2720,7 @@ function closeHistoryDetail() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHistoryDetail(); });
 
 function renderHistory() {
+  try { populateExportPatients(); } catch (e) { /* export state not initialised yet on first paint */ }
   const tbody = document.getElementById("history-body");
   if (!tbody) return;
   if (historyRows.length === 0) {
@@ -3361,6 +3356,7 @@ function displayAnalysisResult(platelets, rbc, wbc, estPerUl, severity, note, zo
   sevEl.innerHTML = '<strong style="display:block;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">' + severity + '</strong>' + (sevLabels[severity] || '') + (note ? '<div style="margin-top:8px;font-size:11px;opacity:.75;font-style:italic;">' + note + '</div>' : '') + zoomNote;
   document.getElementById('analysis-result').style.display = 'block';
   document.getElementById('btn-save-analysis').style.display = 'inline-flex';
+  _exportSelKey = 'current';
   refreshExportPreview();
   updateDashboardStats();
 }
@@ -3817,19 +3813,6 @@ function getClinicalExtras() {
 function resetClinicalExtras() {
   ['patient-name-input','ns1-input','igm-input','igg-input','clin-note-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
 }
-function setExportChoice(v) { try { localStorage.setItem('pw_export_choice', v); } catch(e) {} }
-function runSelectedExport() {
-  const v = document.querySelector('input[name="export-choice"]:checked')?.value || 'pdf';
-  if (v === 'pdf') exportPDF();
-  else if (v === 'image') exportAnnotatedImage();
-  else { exportPDF(); setTimeout(() => exportAnnotatedImage(), 900); }
-}
-(function initExportChoice() {
-  let v = 'pdf';
-  try { v = localStorage.getItem('pw_export_choice') || 'pdf'; } catch(e) {}
-  const r = document.querySelector('input[name="export-choice"][value="' + v + '"]');
-  if (r) r.checked = true;
-})();
 (function initDoctorToggle() {
   let on = true;
   try { on = localStorage.getItem('pw_use_doctor_suggestions') !== '0'; } catch(e) {}
@@ -3865,18 +3848,20 @@ async function saveAnalysisToSupabase() {
   };
   const noteRow  = { clinician_note: extras.note || null };
   const extraRow = { patient_name: extras.patient || null, ns1_antigen: extras.ns1 || null, dengue_igm: extras.igm || null, dengue_igg: extras.igg || null };
-  // Try the full row first; if the table lacks newer columns, retry with fewer so the count itself is never lost.
-  const attempts = [
-    { row: { ...baseRow, ...extraRow, ...noteRow }, dropped: [] },
-    { row: { ...baseRow, ...extraRow }, dropped: ['clinician_note'] },
-    { row: baseRow, dropped: ['patient_name', 'ns1_antigen', 'dengue_igm', 'dengue_igg', 'clinician_note'] },
-  ];
-  let insertedRow = null, error = null, droppedCols = [];
-  for (const at of attempts) {
-    ({ data: insertedRow, error } = await _supabase.from('platelet_analyses').insert(at.row).select().single());
-    if (!error) { droppedCols = at.dropped; break; }
-    if (!/column|schema cache/i.test(error.message || '')) break;
-    console.warn('Insert failed (missing column?), retrying with fewer fields.', error);
+  const detCompact = (_lastDetections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n)), class_name: d.class_name }));
+  const detRow = { detections: detCompact.length ? detCompact : null };
+  // Insert the full row; if the table lacks a newer column, drop just that column and retry so the count is never lost.
+  const payload = { ...baseRow, ...extraRow, ...noteRow, ...detRow };
+  let insertedRow = null, error = null;
+  const droppedCols = [];
+  for (let n = 0; n < 8; n++) {
+    ({ data: insertedRow, error } = await _supabase.from('platelet_analyses').insert(payload).select().single());
+    if (!error) break;
+    const msg = error.message || '';
+    if (!/column|schema cache/i.test(msg)) break;
+    const m = /'([a-z_]+)' column/i.exec(msg) || /column\s+(?:"?[a-z_]+"?\.)?"?([a-z_]+)"?\s+(?:of|does)/i.exec(msg);
+    if (m && (m[1] in payload) && !(m[1] in baseRow)) { droppedCols.push(m[1]); delete payload[m[1]]; continue; }
+    Object.keys(payload).forEach(k => { if (!(k in baseRow)) { droppedCols.push(k); delete payload[k]; } });
   }
   if (!error && droppedCols.length) showErrorModal('Saved (some fields not stored)', 'Your count was saved, but these columns are missing from the platelet_analyses table, so their values were not stored: ' + droppedCols.join(', ') + '.');
   if (error) {
@@ -3887,7 +3872,7 @@ async function saveAnalysisToSupabase() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl });
+    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl, detections: detRow.detections });
     historyRows = [...ALL_HISTORY_ROWS];
     renderHistory();
     if (typeof Chart !== 'undefined') updatePlateletChart();
@@ -3896,8 +3881,62 @@ async function saveAnalysisToSupabase() {
 }
 
 // ── Export Panel ──────────────────────────────────────────────────────
+// ── Export: choose which patient/record to export ─────────────────────
+let _exportOv = null;       // saved record being exported (null = current unsaved analysis)
+let _exportSelKey = null;   // 'current' or a record key
+let _rowKeyCounter = 0;
+function _slug(t) { return String(t || '').trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, ''); }
+function populateExportPatients() {
+  const sel = document.getElementById('export-patient-select');
+  if (!sel) return;
+  ALL_HISTORY_ROWS.forEach(r => { if (!r._k) r._k = r.id ? String(r.id) : 'tmp' + (++_rowKeyCounter); });
+  const hasCurrent = !!currentAnalysisResult;
+  const keys = ALL_HISTORY_ROWS.map(r => r._k);
+  if (!(_exportSelKey === 'current' && hasCurrent) && !keys.includes(_exportSelKey)) {
+    _exportSelKey = hasCurrent ? 'current' : (keys[0] || null);
+  }
+  const opts = [];
+  if (hasCurrent) {
+    const nm = (document.getElementById('patient-name-input')?.value || '').trim();
+    opts.push(`<option value="current">${_hEsc(nm || 'Current analysis')} — not saved yet</option>`);
+  }
+  ALL_HISTORY_ROWS.forEach(r => {
+    const label = `${r.patient || 'No patient name'} — ${formatHistoryDate(r.date)} ${r.time} — ${r.count} /µL (${r.status})`;
+    opts.push(`<option value="${_hEsc(r._k)}">${_hEsc(label)}</option>`);
+  });
+  if (!opts.length) opts.push('<option value="">No patients yet — run and save an analysis first</option>');
+  sel.innerHTML = opts.join('');
+  sel.disabled = !hasCurrent && ALL_HISTORY_ROWS.length === 0;
+  if (_exportSelKey) sel.value = _exportSelKey;
+  _exportOv = (_exportSelKey && _exportSelKey !== 'current') ? (ALL_HISTORY_ROWS.find(r => r._k === _exportSelKey) || null) : null;
+  const meta = document.getElementById('export-patient-meta');
+  if (meta) {
+    if (_exportOv) {
+      const t = (_exportOv.ns1 || _exportOv.igm || _exportOv.igg) ? `NS1: ${_hEsc(_exportOv.ns1 || '—')} · IgM: ${_hEsc(_exportOv.igm || '—')} · IgG: ${_hEsc(_exportOv.igg || '—')}` : '';
+      const n = _exportOv.note ? `Note: “${_hEsc(_exportOv.note)}”` : '';
+      meta.innerHTML = [t, n].filter(Boolean).join('<br>') || 'No confirmatory tests or note recorded for this patient.';
+    } else if (_exportSelKey === 'current') {
+      meta.textContent = 'Exporting the analysis currently on screen (includes the patient, tests and note you typed in Image Analysis).';
+    } else meta.textContent = '';
+  }
+}
+function onExportPatientChange() {
+  _exportSelKey = document.getElementById('export-patient-select').value || null;
+  refreshExportPreview();
+}
+async function _ovImageDataUrl() {
+  const u = _exportOv && _exportOv.image_url;
+  if (!u) return null;
+  try {
+    const r = await fetch(u);
+    const b = await r.blob();
+    return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+  } catch (e) { console.warn('Could not load saved image for PDF', e); return null; }
+}
+
 function refreshExportPreview() {
-  const src = currentAnalysisResult;
+  populateExportPatients();
+  const src = _exportOv ? { platelets: _exportOv.plt ?? 0, rbc: _exportOv.rbc ?? 0, wbc: _exportOv.wbc ?? 0, estPerUl: _exportOv.est ?? 0, severity: _exportOv.status } : currentAnalysisResult;
   const badge  = document.getElementById('export-status-badge');
   const noData = document.getElementById('ep-no-data');
   const sevBar = document.getElementById('ep-severity-bar');
@@ -3997,7 +4036,7 @@ async function exportPDF() {
     doc.setFontSize(6);
     doc.text('Not a medical diagnosis', W - mg - 28, 22, { align: 'center' });
     y = 48;
-    const _ex = getClinicalExtras();
+    const _ex = _exportOv ? { patient: _exportOv.patient, useTests: !!(_exportOv.ns1 || _exportOv.igm || _exportOv.igg), ns1: _exportOv.ns1, igm: _exportOv.igm, igg: _exportOv.igg, note: _exportOv.note } : getClinicalExtras();
     const patName  = _ex.patient || document.querySelector('.user-info strong')?.textContent || 'Unknown';
     const patEmail = document.querySelector('.user-info span')?.textContent || '';
     doc.setFillColor(248, 244, 244);
@@ -4015,7 +4054,7 @@ async function exportPDF() {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(26, 6, 8);
     doc.text(now.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }), W - mg - 4, y + 15, { align: 'right' });
     y += 29;
-    const res = currentAnalysisResult;
+    const res = _exportOv ? { platelets: _exportOv.plt ?? 0, rbc: _exportOv.rbc ?? 0, wbc: _exportOv.wbc ?? 0, estPerUl: _exportOv.est ?? 0, severity: _exportOv.status } : currentAnalysisResult;
     if (res) {
       const { platelets, rbc, wbc, estPerUl, severity } = res;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(90, 58, 62);
@@ -4083,8 +4122,8 @@ async function exportPDF() {
           y += nh + 6;
         }
       }
-      const imgEl = document.getElementById('preview-img');
-      if (imgEl && imgEl.src && imgEl.src.length > 10 && !imgEl.src.endsWith('#')) {
+      const _imgSrc = _exportOv ? await _ovImageDataUrl() : (() => { const e = document.getElementById('preview-img'); return (e && e.src && e.src.length > 10 && !e.src.endsWith('#')) ? e.src : null; })();
+      if (_imgSrc) {
         doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90,58,62);
         doc.text('MICROSCOPE IMAGE', mg, y);
         doc.setDrawColor(190,181,181);
@@ -4092,7 +4131,7 @@ async function exportPDF() {
         y += 5;
         try {
           const iW = W - mg*2, iH = 72;
-          doc.addImage(imgEl.src, 'JPEG', mg, y, iW, iH, undefined, 'FAST');
+          doc.addImage(_imgSrc, /^data:image\/png/i.test(_imgSrc) ? 'PNG' : 'JPEG', mg, y, iW, iH, undefined, 'FAST');
           doc.setDrawColor(237,232,232); doc.rect(mg, y, iW, iH, 'S');
           y += iH + 8;
         } catch(e) { y += 4; }
@@ -4151,7 +4190,7 @@ async function exportPDF() {
     doc.setFillColor(237,232,232); doc.rect(0, pH - 10, W, 10, 'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(154,128,130);
     doc.text('PlateletWatch — Dengue Detection System  ·  For Screening Purposes Only  ·  RA 10173 Compliant', W/2, pH - 4, { align:'center' });
-    const fname = 'PlateletWatch_Report_' + now.toISOString().slice(0,10) + '.pdf';
+    const fname = 'PlateletWatch_Report_' + (_slug(patName) ? _slug(patName) + '_' : '') + now.toISOString().slice(0,10) + '.pdf';
     doc.save(fname);
   } catch(e) {
     console.error('PDF export error:', e);
@@ -4167,7 +4206,11 @@ async function exportAnnotatedImage() {
   const btn = document.getElementById('btn-export-png');
   const origHTML = btn.innerHTML;
   const imgEl = document.getElementById('preview-img');
-  if (!imgEl || !imgEl.src || imgEl.src.length < 10 || imgEl.src.endsWith('#')) {
+  if (_exportOv && !_exportOv.image_url) {
+    showErrorModal('No Image Saved', 'This patient record has no saved microscope image to annotate.');
+    return;
+  }
+  if (!_exportOv && (!imgEl || !imgEl.src || imgEl.src.length < 10 || imgEl.src.endsWith('#'))) {
     const latestImg = ALL_HISTORY_ROWS.find(r => r.image_url);
     if (latestImg) {
       const a = document.createElement('a');
@@ -4183,14 +4226,17 @@ async function exportAnnotatedImage() {
   btn.disabled = true;
   btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="animation:spin 1s linear infinite"><circle cx="7" cy="7" r="5.5" stroke="rgba(13,115,119,.3)" stroke-width="1.3"/><path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="var(--teal)" stroke-width="1.3" stroke-linecap="round"/></svg> Annotating…';
   try {
-    const platelets = currentAnalysisResult?.platelets ?? 0;
-    const severity  = currentAnalysisResult?.severity  ?? null;
-    const estPerUl  = currentAnalysisResult?.estPerUl  ?? 0;
+    const platelets = _exportOv ? (_exportOv.plt ?? 0) : (currentAnalysisResult?.platelets ?? 0);
+    const severity  = _exportOv ? (_exportOv.status ?? null) : (currentAnalysisResult?.severity ?? null);
+    const estPerUl  = _exportOv ? (_exportOv.est ?? 0) : (currentAnalysisResult?.estPerUl ?? 0);
+    const _dets = _exportOv ? (_exportOv.detections || []) : _lastDetections;
+    const _patForName = _exportOv ? _exportOv.patient : (document.getElementById('patient-name-input')?.value || '');
     await new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const img = new Image();
       let blobUrl = null;
-      if (currentImageFile) { blobUrl = URL.createObjectURL(currentImageFile); img.src = blobUrl; }
+      if (_exportOv) { img.crossOrigin = 'anonymous'; img.src = _exportOv.image_url; }
+      else if (currentImageFile) { blobUrl = URL.createObjectURL(currentImageFile); img.src = blobUrl; }
       else { if (!imgEl.src.startsWith('data:')) img.crossOrigin = 'anonymous'; img.src = imgEl.src; }
       function drawAndDownload() {
         canvas.width  = img.naturalWidth  || 1200;
@@ -4199,12 +4245,12 @@ async function exportAnnotatedImage() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, W, H);
         const count = Math.max(0, Math.min(platelets, 120));
-        if (_lastDetections && _lastDetections.length > 0) {
+        if (_dets && _dets.length > 0) {
           // Draw actual AI-detected bounding boxes
           const colors   = { Platelet: '#22D3EE', RBC: '#f87171', WBC: '#fbbf24' };
           const bgColors = { Platelet: 'rgba(34,211,238,0.18)', RBC: 'rgba(248,113,113,0.12)', WBC: 'rgba(251,191,36,0.12)' };
           let platIdx = 0;
-          _lastDetections.forEach((det) => {
+          _dets.forEach((det) => {
             const [x1, y1, x2, y2] = det.bbox;
             const bw = x2 - x1, bh = y2 - y1;
             const color   = colors[det.class_name]   || '#ffffff';
@@ -4248,7 +4294,7 @@ async function exportAnnotatedImage() {
             ctx.fillText(item.label, llx + lPad + lRectSz + 6, lly + lItemH / 2);
             lly += lItemH + 4;
           });
-        } else if (count > 0) {
+        } else if (count > 0 && !_exportOv) {
           const radius = Math.round(Math.min(W, H) * 0.023);
           const pad    = radius * 3;
           let seed = platelets * 13 + W * 7 + H * 3;
@@ -4307,7 +4353,7 @@ async function exportAnnotatedImage() {
         ctx.fillText('PlateletWatch', W - 16, 16);
         ctx.restore();
         const now2 = new Date();
-        const fname = 'PlateletWatch_Annotated_' + now2.toISOString().slice(0,10) + '.png';
+        const fname = 'PlateletWatch_Annotated_' + (_slug(_patForName) ? _slug(_patForName) + '_' : '') + now2.toISOString().slice(0,10) + '.png';
         canvas.toBlob(function(blob) {
           if (blobUrl) URL.revokeObjectURL(blobUrl);
           if (!blob) { reject(new Error('Canvas toBlob failed')); return; }
@@ -4319,7 +4365,7 @@ async function exportAnnotatedImage() {
           resolve();
         }, 'image/png');
       }
-      img.onload = drawAndDownload;
+      img.onload = function() { try { drawAndDownload(); } catch (err) { if (blobUrl) URL.revokeObjectURL(blobUrl); reject(err); } };
       img.onerror = function() {
         if (blobUrl) URL.revokeObjectURL(blobUrl);
         reject(new Error('Image failed to load. Try re-uploading the image in the Image Analysis tab.'));
@@ -4372,7 +4418,7 @@ async function loadAnalysisHistory() {
       const dt = new Date(a.created_at);
       const dateStr = dt.toISOString().split('T')[0];
       const timeStr = dt.toTimeString().slice(0, 5);
-      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul });
+      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul, detections: a.detections || null });
     });
   }
   historyRows = [...ALL_HISTORY_ROWS];
