@@ -1457,6 +1457,45 @@ body{background-image:none;}
               <div style="text-align:center;background:var(--warning-light);border-radius:var(--radius-sm);padding:14px;"><div style="font-family:var(--font-display);font-size:22px;color:#fbbf24;" id="result-wbc">—</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px;">White Blood Cells</div></div>
               <div style="text-align:center;background:var(--crimson-pale);border-radius:var(--radius-sm);padding:14px;"><div style="font-family:var(--font-display);font-size:22px;color:var(--crimson);" id="result-est">—</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Est. /µL</div><button class="copy-btn" id="copy-count-btn" onclick="copyCountToClipboard()" style="margin-top:6px;">Copy</button></div></div>
             </div>
+            <!-- ★ PATIENT + DOCTOR-SUGGESTED CONFIRMATORY TESTS -->
+            <div id="clinical-extras" style="border:1.5px solid var(--warm-gray);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:14px;background:var(--off-white);">
+              <div class="form-grid" style="margin-bottom:0;">
+                <div class="field-group field-full">
+                  <label class="field-label" for="patient-name-input">Patient</label>
+                  <input class="field-input" id="patient-name-input" type="text" placeholder="Patient full name" autocomplete="off">
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 0;padding-top:12px;border-top:1px dashed var(--warm-gray);">
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text-dark);">Doctor-suggested confirmatory tests</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Turn off to hide these fields and leave them out of the saved record and report.</div>
+                </div>
+                <label class="doc-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                  <span id="doc-suggest-state" style="font-size:11px;font-weight:700;color:var(--teal);min-width:24px;text-align:right;">ON</span>
+                  <input type="checkbox" id="doc-suggest-toggle" checked onchange="toggleDoctorSuggestions(this.checked)" role="switch" aria-label="Use doctor-suggested tests" style="position:absolute;opacity:0;width:0;height:0;">
+                  <span id="doc-suggest-track" style="position:relative;width:38px;height:22px;border-radius:100px;background:var(--teal);transition:background .2s;flex-shrink:0;"><span id="doc-suggest-knob" style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;"></span></span>
+                </label>
+              </div>
+              <div id="doc-suggest-fields" style="margin-top:12px;">
+                <div class="form-grid" style="margin-bottom:6px;">
+                  <div class="field-group field-full">
+                    <label class="field-label" for="ns1-input">NS1 (antigen)</label>
+                    <input class="field-input" id="ns1-input" type="text" placeholder="e.g. Positive / Negative" autocomplete="off">
+                  </div>
+                  <div class="field-group field-full" style="margin-top:2px;">
+                    <span class="field-label">Dengue Blot (IgM &amp; IgG) <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted);">— to be filled in by the Med Tech</span></span>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="igm-input">IgM</label>
+                    <input class="field-input" id="igm-input" type="text" placeholder="e.g. Positive / Negative" autocomplete="off">
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="igg-input">IgG</label>
+                    <input class="field-input" id="igg-input" type="text" placeholder="e.g. Positive / Negative" autocomplete="off">
+                  </div>
+                </div>
+              </div>
+            </div>
             <div id="result-severity" style="display:none;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:12px;"></div>
             <button class="btn-primary-sm" onclick="saveAnalysisToSupabase()" id="btn-save-analysis" style="display:none;">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5"/></svg>
@@ -2846,6 +2885,7 @@ function clearImage() {
   document.getElementById('camera-input').value = '';
   document.getElementById('analysis-result').style.display = 'none';
   document.getElementById('btn-save-analysis').style.display = 'none';
+  resetClinicalExtras();
   hideSmearGateOverlay();
   // Hide Add as Field button when image is cleared
   const addFieldBtn = document.getElementById('btn-add-field');
@@ -3634,6 +3674,38 @@ function finalizeFieldSession() {
   document.getElementById('analysis-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── Patient + doctor-suggested tests (NS1, Dengue Blot IgM/IgG) ───────
+function toggleDoctorSuggestions(on, skipStore) {
+  const f = document.getElementById('doc-suggest-fields');
+  if (f) f.style.display = on ? '' : 'none';
+  const cb = document.getElementById('doc-suggest-toggle');
+  if (cb) cb.checked = on;
+  const tr = document.getElementById('doc-suggest-track'), kn = document.getElementById('doc-suggest-knob'), st = document.getElementById('doc-suggest-state');
+  if (tr) tr.style.background = on ? 'var(--teal)' : 'var(--mid-gray)';
+  if (kn) kn.style.left = on ? '18px' : '2px';
+  if (st) { st.textContent = on ? 'ON' : 'OFF'; st.style.color = on ? 'var(--teal)' : 'var(--text-muted)'; }
+  if (!skipStore) { try { localStorage.setItem('pw_use_doctor_suggestions', on ? '1' : '0'); } catch(e) {} }
+}
+function getClinicalExtras() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const on = document.getElementById('doc-suggest-toggle')?.checked !== false;
+  return {
+    patient: v('patient-name-input'),
+    useTests: on,
+    ns1: on ? v('ns1-input') : '',
+    igm: on ? v('igm-input') : '',
+    igg: on ? v('igg-input') : ''
+  };
+}
+function resetClinicalExtras() {
+  ['patient-name-input','ns1-input','igm-input','igg-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+}
+(function initDoctorToggle() {
+  let on = true;
+  try { on = localStorage.getItem('pw_use_doctor_suggestions') !== '0'; } catch(e) {}
+  toggleDoctorSuggestions(on, true);
+})();
+
 async function saveAnalysisToSupabase() {
   if (!currentAnalysisResult) return;
   const { data: { session } } = await _supabase.auth.getSession();
@@ -3651,7 +3723,8 @@ async function saveAnalysisToSupabase() {
     }
   }
   const { platelets, rbc, wbc, estPerUl, severity } = currentAnalysisResult;
-  const { data: insertedRow, error } = await _supabase.from('platelet_analyses').insert({
+  const extras = getClinicalExtras();
+  const baseRow = {
     user_id: session.user.id,
     image_url: imageUrl,
     platelet_count: platelets,
@@ -3659,7 +3732,15 @@ async function saveAnalysisToSupabase() {
     wbc_count: wbc,
     est_count_per_ul: estPerUl,
     severity: severity,
-  }).select().single();
+  };
+  const extraRow = { patient_name: extras.patient || null, ns1_antigen: extras.ns1 || null, dengue_igm: extras.igm || null, dengue_igg: extras.igg || null };
+  let { data: insertedRow, error } = await _supabase.from('platelet_analyses').insert({ ...baseRow, ...extraRow }).select().single();
+  if (error && /column|schema cache/i.test(error.message || '')) {
+    // Table doesn't have the new columns yet — save the core result so nothing is lost.
+    console.warn('Extra columns missing in platelet_analyses; saving core result only.', error);
+    ({ data: insertedRow, error } = await _supabase.from('platelet_analyses').insert(baseRow).select().single());
+    if (!error) showErrorModal('Saved (without patient/test fields)', 'Your count was saved, but the database is missing the columns patient_name, ns1_antigen, dengue_igm and dengue_igg. Add them to the platelet_analyses table to store these fields.');
+  }
   if (error) {
     console.error('Save error:', error);
     showErrorModal('Save Failed', 'Error saving analysis: ' + error.message);
@@ -3778,7 +3859,8 @@ async function exportPDF() {
     doc.setFontSize(6);
     doc.text('Not a medical diagnosis', W - mg - 28, 22, { align: 'center' });
     y = 48;
-    const patName  = document.querySelector('.user-info strong')?.textContent || 'Unknown';
+    const _ex = getClinicalExtras();
+    const patName  = _ex.patient || document.querySelector('.user-info strong')?.textContent || 'Unknown';
     const patEmail = document.querySelector('.user-info span')?.textContent || '';
     doc.setFillColor(248, 244, 244);
     doc.rect(mg, y, W - mg*2, 22, 'F');
@@ -3835,6 +3917,23 @@ async function exportPDF() {
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...sc.txt);
       doc.text(sc.desc, mg + 5, y + 15);
       y += 25;
+      if (_ex.useTests) {
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90, 58, 62);
+        doc.text('CONFIRMATORY TESTS (DOCTOR-SUGGESTED)', mg, y);
+        doc.setDrawColor(190,181,181); doc.line(mg + 78, y - 1, W - mg, y - 1);
+        y += 5;
+        const tW = (W - mg*2 - 6) / 3;
+        [['NS1 (antigen)', _ex.ns1], ['Dengue Blot IgM', _ex.igm], ['Dengue Blot IgG', _ex.igg]].forEach((t, i) => {
+          const tx = mg + i * (tW + 3);
+          doc.setFillColor(248,244,244); doc.rect(tx, y, tW, 16, 'F');
+          doc.setDrawColor(237,232,232); doc.rect(tx, y, tW, 16, 'S');
+          doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(154,128,130);
+          doc.text(t[0], tx + 3, y + 5.5);
+          doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,6,8);
+          doc.text(t[1] || '________', tx + 3, y + 12);
+        });
+        y += 22;
+      }
       const imgEl = document.getElementById('preview-img');
       if (imgEl && imgEl.src && imgEl.src.length > 10 && !imgEl.src.endsWith('#')) {
         doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90,58,62);
