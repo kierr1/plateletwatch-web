@@ -756,8 +756,46 @@
     } catch (e) {}
   })();
 
+  // ── Login attempt limit: 3 wrong passwords → 60-second cooldown ──────
+  const MAX_FAILED_ATTEMPTS = 3;
+  const LOCKOUT_SECONDS     = 60;
+  const LOCK_KEY = 'pw-signin-lock-until';
+  const FAIL_KEY = 'pw-signin-fail-count';
+  const _signinBtnHTML = (document.getElementById('signin-btn') || {}).innerHTML || 'Sign In';
+  let _lockTimer = null;
+
+  function _store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, String(v)); } catch (e) {} }
+  function _read(k)     { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lockRemainingSeconds() {
+    const until = parseInt(_read(LOCK_KEY) || '0', 10);
+    return until > Date.now() ? Math.ceil((until - Date.now()) / 1000) : 0;
+  }
+  function startLockout() {
+    const btn = document.getElementById('signin-btn');
+    if (_lockTimer) clearInterval(_lockTimer);
+    btn.disabled = true;
+    const tick = () => {
+      const left = lockRemainingSeconds();
+      if (left <= 0) {
+        clearInterval(_lockTimer); _lockTimer = null;
+        _store(LOCK_KEY, null); _store(FAIL_KEY, null);
+        hideAlert();
+        btn.disabled = false;
+        btn.innerHTML = _signinBtnHTML;
+        return;
+      }
+      btn.textContent = 'Try again in ' + left + 's';
+      showAlert('Too many incorrect passwords. Please wait ' + left + ' second' + (left === 1 ? '' : 's') + ' before trying again.', 'error');
+    };
+    tick();
+    if (lockRemainingSeconds() > 0) _lockTimer = setInterval(tick, 1000);
+  }
+  // Keep the cooldown running if the page is refreshed
+  if (lockRemainingSeconds() > 0) startLockout();
+
   // ── Email / Password Sign In ────────────────────────────────────────
   async function handleSignIn() {
+    if (lockRemainingSeconds() > 0) { startLockout(); return; }
     hideAlert();
     const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('pw').value;
@@ -781,11 +819,26 @@
       if (isUnconfirmed) {
         showAlert('Please verify your email address before signing in. Check your inbox for the confirmation link.', 'error', true);
       } else {
-        showAlert(error.message);
+        const isWrongCreds = error.code === 'invalid_credentials' || /invalid login credentials/i.test(error.message || '');
+        if (isWrongCreds) {
+          const fails = parseInt(_read(FAIL_KEY) || '0', 10) + 1;
+          if (fails >= MAX_FAILED_ATTEMPTS) {
+            _store(FAIL_KEY, fails);
+            _store(LOCK_KEY, Date.now() + LOCKOUT_SECONDS * 1000);
+            startLockout();
+            return;
+          }
+          _store(FAIL_KEY, fails);
+          const left = MAX_FAILED_ATTEMPTS - fails;
+          showAlert('Incorrect email or password. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left before a ' + LOCKOUT_SECONDS + '-second lockout.');
+        } else {
+          showAlert(error.message);
+        }
       }
       btn.disabled = false;
       btn.innerHTML = '<span><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.4v11.2L13.5 8 4 2.4Z"/></svg></span> Sign In';
     } else {
+      _store(FAIL_KEY, null); _store(LOCK_KEY, null);
       btn.innerHTML = 'Redirecting…';
       window.location.href = '/dashboard';
     }
