@@ -240,6 +240,19 @@ html,body{height:100%;font-family:var(--font-ui);color:var(--text-dark);backgrou
 textarea.field-input{min-height:80px;resize:vertical;}
 .field-full{grid-column:1/-1;}
 
+/* Clinical extras (patient + doctor-suggested tests): keep inside card on phones */
+#clinical-extras{box-sizing:border-box;max-width:100%;min-width:0;overflow:hidden;}
+#clinical-extras .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+#clinical-extras .field-group{min-width:0;}
+#clinical-extras .field-input{width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
+#clinical-extras .field-label{overflow-wrap:anywhere;}
+@media (max-width:520px){
+  #clinical-extras{padding:12px !important;}
+  #clinical-extras .field-input{font-size:16px;padding:10px;}
+  #clinical-extras .field-input::placeholder{font-size:12.5px;}
+  #clinical-extras .form-grid{gap:12px;}
+}
+
 /* HISTORY TABLE */
 .table-card{background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:22px;box-shadow:var(--shadow-sm);}
 .data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
