@@ -262,6 +262,24 @@ textarea.field-input{min-height:80px;resize:vertical;}
 .hist-meta .hm-tests{color:var(--text-mid);}
 .hist-meta .hm-note{color:var(--text-muted);font-style:italic;overflow-wrap:anywhere;}
 .hist-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.hist-row{cursor:pointer;}
+.hist-row:focus-visible{outline:2px solid var(--teal);outline-offset:-2px;}
+.hd-box{background:var(--white);border-radius:var(--radius-lg);width:min(580px,94vw);max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(26,6,8,.22);transform:translateY(14px) scale(.97);transition:transform .25s,opacity .25s;opacity:0;}
+.modal-overlay.open .hd-box{transform:translateY(0) scale(1);opacity:1;}
+.hd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 24px 14px;border-bottom:1px solid var(--warm-gray);position:sticky;top:0;background:var(--white);z-index:1;}
+.hd-body{padding:18px 24px 24px;}
+.hd-sec{font-size:10.5px;font-weight:700;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase;margin:18px 0 8px;}
+.hd-sec:first-child{margin-top:0;}
+.hd-grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+.hd-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.hd-tile{border-radius:var(--radius-sm);padding:12px 8px;text-align:center;min-width:0;}
+.hd-tile b{display:block;font-family:var(--font-display);font-size:19px;overflow-wrap:anywhere;}
+.hd-tile span{display:block;font-size:10px;color:var(--text-muted);margin-top:2px;}
+.hd-test{background:var(--off-white);border:1px solid var(--warm-gray);border-radius:var(--radius-sm);padding:10px 12px;min-width:0;}
+.hd-test span{display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.hd-test b{font-size:13px;color:var(--text-dark);overflow-wrap:anywhere;}
+.hd-note{background:#fff8e7;border:1px solid #f5c842;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;line-height:1.6;color:#4a3300;white-space:pre-wrap;overflow-wrap:anywhere;}
+@media (max-width:520px){.hd-grid4{grid-template-columns:repeat(2,minmax(0,1fr));}.hd-grid3{grid-template-columns:1fr;}.hd-head{padding:18px 16px 12px;}.hd-body{padding:14px 16px 20px;}}
 /* HISTORY TABLE */
 .table-card{background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:22px;box-shadow:var(--shadow-sm);}
 .data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -1523,14 +1541,6 @@ body{background-image:none;}
               </div>
             </div>
             <div id="result-severity" style="display:none;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:12px;"></div>
-            <div id="save-download-choice" style="margin-bottom:12px;">
-              <div style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">When saving, also download</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <label class="dl-opt"><input type="radio" name="save-dl" value="none" checked onchange="setSaveDownload(this.value)"><span>Nothing</span></label>
-                <label class="dl-opt"><input type="radio" name="save-dl" value="pdf" onchange="setSaveDownload(this.value)"><span>PDF report</span></label>
-                <label class="dl-opt"><input type="radio" name="save-dl" value="image" onchange="setSaveDownload(this.value)"><span>Annotated image</span></label>
-              </div>
-            </div>
             <button class="btn-primary-sm" onclick="saveAnalysisToSupabase()" id="btn-save-analysis" style="display:none;">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5"/></svg>
               Save to History
@@ -1622,6 +1632,19 @@ body{background-image:none;}
             Run an analysis in the <strong style="color:var(--crimson);cursor:pointer;" onclick="switchTab('analysis')">Image Analysis tab</strong> first to populate the report.
           </div>
         </div>
+      </div>
+
+      <div id="export-choice-card" style="background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:18px 22px;margin-bottom:18px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Choose what to download</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+          <label class="dl-opt"><input type="radio" name="export-choice" value="pdf" checked onchange="setExportChoice(this.value)"><span>PDF report</span></label>
+          <label class="dl-opt"><input type="radio" name="export-choice" value="image" onchange="setExportChoice(this.value)"><span>Annotated image</span></label>
+          <label class="dl-opt"><input type="radio" name="export-choice" value="both" onchange="setExportChoice(this.value)"><span>Both</span></label>
+        </div>
+        <button class="btn-primary-sm" id="btn-export-selected" onclick="runSelectedExport()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5V11H11V9.5M6.5 2V9M4.5 7L6.5 9L8.5 7"/></svg>
+          Download selected
+        </button>
       </div>
 
       <div class="export-grid">
@@ -1744,6 +1767,19 @@ body{background-image:none;}
 </div>
 
 <!-- IMAGE LIGHTBOX MODAL -->
+<div class="modal-overlay" id="hist-detail-modal" role="dialog" aria-modal="true" aria-labelledby="hd-title" onclick="if(event.target===this)closeHistoryDetail()">
+  <div class="hd-box">
+    <div class="hd-head">
+      <div style="min-width:0;">
+        <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px;">Patient</div>
+        <div id="hd-title" style="font-family:var(--font-display);font-size:20px;color:var(--text-dark);overflow-wrap:anywhere;">—</div>
+        <div id="hd-sub" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+      </div>
+      <button onclick="closeHistoryDetail()" aria-label="Close" style="background:none;border:1px solid var(--warm-gray);border-radius:50%;width:32px;height:32px;flex-shrink:0;cursor:pointer;font-size:18px;line-height:1;color:var(--text-muted);">&times;</button>
+    </div>
+    <div class="hd-body" id="hd-body"></div>
+  </div>
+</div>
 <div id="img-lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(26,6,8,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9500;align-items:center;justify-content:center;flex-direction:column;gap:14px;">
   <button onclick="closeLightbox()" aria-label="Close image" style="position:absolute;top:18px;right:22px;background:rgba(255,255,255,.12);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;">✕</button>
   <img id="lightbox-img" src="" alt="Microscope image" onclick="event.stopPropagation()" style="max-width:90vw;max-height:80vh;border-radius:10px;border:2px solid rgba(255,255,255,.15);object-fit:contain;box-shadow:0 24px 60px rgba(0,0,0,.5);">
@@ -2656,6 +2692,39 @@ function _histMetaHtml(r) {
   const note = r.note ? `<div class="hm-note">“${_hEsc(r.note)}”</div>` : '';
   return name + tests + note;
 }
+function openHistoryDetail(i) {
+  const r = historyRows[i];
+  if (!r) return;
+  const num = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString();
+  const test = (label, val) => `<div class="hd-test"><span>${label}</span><b style="${val ? '' : 'font-weight:500;color:var(--mid-gray);'}">${val ? _hEsc(val) : 'Not recorded'}</b></div>`;
+  document.getElementById('hd-title').textContent = r.patient || 'No patient name';
+  document.getElementById('hd-sub').textContent = formatHistoryDate(r.date) + ' · ' + r.time;
+  const img = r.image_url
+    ? `<div class="hd-sec">Microscope image</div><img src="${r.image_url}" alt="Microscope image" onclick="openLightbox('${r.image_url}', '${_hEsc(formatHistoryDate(r.date))} · ${r.time}')" style="width:100%;max-height:260px;object-fit:contain;background:#0a0d14;border-radius:var(--radius-sm);cursor:zoom-in;display:block;" onerror="this.style.display='none'">`
+    : '';
+  document.getElementById('hd-body').innerHTML = `
+    <div class="hd-sec">Result</div>
+    <div style="margin-bottom:10px;"><span style="${getStatusStyle(r.level)}">${_hEsc(r.status)}</span></div>
+    <div class="hd-grid4">
+      <div class="hd-tile" style="background:var(--teal-light);"><b style="color:var(--teal);">${num(r.plt)}</b><span>Platelets</span></div>
+      <div class="hd-tile" style="background:#fef2f2;"><b style="color:#f87171;">${num(r.rbc)}</b><span>Red Blood Cells</span></div>
+      <div class="hd-tile" style="background:var(--warning-light);"><b style="color:#d97706;">${num(r.wbc)}</b><span>White Blood Cells</span></div>
+      <div class="hd-tile" style="background:var(--crimson-pale);"><b style="color:var(--crimson);">${r.est != null ? num(r.est) : _hEsc(r.count)}</b><span>Est. /µL</span></div>
+    </div>
+    <div class="hd-sec">Confirmatory tests</div>
+    <div class="hd-grid3">${test('NS1 (antigen)', r.ns1)}${test('Dengue Blot IgM', r.igm)}${test('Dengue Blot IgG', r.igg)}</div>
+    <div class="hd-sec">Doctor / Med Tech note</div>
+    ${r.note ? `<div class="hd-note">${_hEsc(r.note)}</div>` : `<div style="font-size:13px;color:var(--mid-gray);">No note recorded.</div>`}
+    ${img}`;
+  document.getElementById('hist-detail-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeHistoryDetail() {
+  document.getElementById('hist-detail-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHistoryDetail(); });
+
 function renderHistory() {
   const tbody = document.getElementById("history-body");
   if (!tbody) return;
@@ -2667,7 +2736,7 @@ function renderHistory() {
     const thumbCell = r.image_url
       ? `<td style="text-align:center;">
            <img src="${r.image_url}" alt="Microscope image"
-             onclick="openLightbox('${r.image_url}', '${formatHistoryDate(r.date)} · ${r.time} · ${r.count} /µL')"
+             onclick="event.stopPropagation();openLightbox('${r.image_url}', '${formatHistoryDate(r.date)} · ${r.time} · ${r.count} /µL')"
              style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1.5px solid var(--warm-gray);cursor:zoom-in;transition:transform .15s,border-color .15s;"
              onmouseover="this.style.transform='scale(1.08)';this.style.borderColor='var(--crimson)'"
              onmouseout="this.style.transform='scale(1)';this.style.borderColor='var(--warm-gray)'"
@@ -2676,14 +2745,16 @@ function renderHistory() {
       : `<td style="text-align:center;"><span style="font-size:11px;color:var(--mid-gray);">—</span></td>`;
     const metaCell = `<td><div class="hist-meta">${_histMetaHtml(r)}</div></td>`;
     return `
-    <tr>
+    <tr class="hist-row" tabindex="0" onclick="openHistoryDetail(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openHistoryDetail(${i})}" title="Click to view full record">
       <td>${formatHistoryDate(r.date)}&nbsp;&nbsp;${r.time}</td>
       ${thumbCell}
       ${metaCell}
       <td style="text-align:center;">${r.count}</td>
       <td style="text-align:center;"><span style="${getStatusStyle(r.level)}">${r.status}</span></td>
-      <td style="text-align:center;">
-        <button onclick="deleteHistoryRow(${i})" aria-label="Delete record"
+      <td style="text-align:center;white-space:nowrap;">
+        <button onclick="event.stopPropagation();openHistoryDetail(${i})" aria-label="View record"
+          style="background:none;border:1px solid var(--warm-gray);border-radius:var(--radius-sm);height:34px;padding:0 12px;margin-right:6px;font-size:12px;font-weight:600;font-family:var(--font-ui);cursor:pointer;color:var(--text-mid);">View</button>
+        <button onclick="event.stopPropagation();deleteHistoryRow(${i})" aria-label="Delete record"
           style="background:none;border:1px solid var(--warm-gray);border-radius:var(--radius-sm);width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);transition:all .18s;"
           onmouseover="this.style.background='var(--crimson-pale)';this.style.color='var(--crimson)';this.style.borderColor='var(--crimson-light)'"
           onmouseout="this.style.background='none';this.style.color='var(--text-muted)';this.style.borderColor='var(--warm-gray)'">
@@ -3746,11 +3817,17 @@ function getClinicalExtras() {
 function resetClinicalExtras() {
   ['patient-name-input','ns1-input','igm-input','igg-input','clin-note-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
 }
-function setSaveDownload(v) { try { localStorage.setItem('pw_save_download', v); } catch(e) {} }
-(function initSaveDownload() {
-  let v = 'none';
-  try { v = localStorage.getItem('pw_save_download') || 'none'; } catch(e) {}
-  const r = document.querySelector('input[name="save-dl"][value="' + v + '"]');
+function setExportChoice(v) { try { localStorage.setItem('pw_export_choice', v); } catch(e) {} }
+function runSelectedExport() {
+  const v = document.querySelector('input[name="export-choice"]:checked')?.value || 'pdf';
+  if (v === 'pdf') exportPDF();
+  else if (v === 'image') exportAnnotatedImage();
+  else { exportPDF(); setTimeout(() => exportAnnotatedImage(), 900); }
+}
+(function initExportChoice() {
+  let v = 'pdf';
+  try { v = localStorage.getItem('pw_export_choice') || 'pdf'; } catch(e) {}
+  const r = document.querySelector('input[name="export-choice"][value="' + v + '"]');
   if (r) r.checked = true;
 })();
 (function initDoctorToggle() {
@@ -3810,13 +3887,10 @@ async function saveAnalysisToSupabase() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note });
+    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl });
     historyRows = [...ALL_HISTORY_ROWS];
     renderHistory();
     if (typeof Chart !== 'undefined') updatePlateletChart();
-    const dlChoice = document.querySelector('input[name="save-dl"]:checked')?.value || 'none';
-    if (dlChoice === 'pdf') setTimeout(() => exportPDF(), 250);
-    else if (dlChoice === 'image') setTimeout(() => exportAnnotatedImage(), 250);
   }
   setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5"/></svg> Save to History'; }, 2000);
 }
@@ -4298,7 +4372,7 @@ async function loadAnalysisHistory() {
       const dt = new Date(a.created_at);
       const dateStr = dt.toISOString().split('T')[0];
       const timeStr = dt.toTimeString().slice(0, 5);
-      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '' });
+      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul });
     });
   }
   historyRows = [...ALL_HISTORY_ROWS];
