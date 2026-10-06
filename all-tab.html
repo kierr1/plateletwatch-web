@@ -253,6 +253,15 @@ textarea.field-input{min-height:80px;resize:vertical;}
   #clinical-extras .form-grid{gap:12px;}
 }
 
+.dl-opt{display:flex;align-items:center;gap:7px;border:1.5px solid var(--warm-gray);border-radius:var(--radius-sm);padding:8px 12px;font-size:12.5px;color:var(--text-mid);cursor:pointer;user-select:none;transition:all .15s;}
+.dl-opt input{position:absolute;opacity:0;width:0;height:0;}
+.dl-opt:has(input:checked){border-color:var(--teal);background:var(--teal-light);color:var(--teal);font-weight:600;}
+.dl-opt:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px;}
+.hist-meta{font-size:11.5px;line-height:1.55;min-width:150px;max-width:260px;}
+.hist-meta .hm-name{font-weight:700;color:var(--text-dark);}
+.hist-meta .hm-tests{color:var(--text-mid);}
+.hist-meta .hm-note{color:var(--text-muted);font-style:italic;overflow-wrap:anywhere;}
+.hist-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 /* HISTORY TABLE */
 .table-card{background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:22px;box-shadow:var(--shadow-sm);}
 .data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -1506,10 +1515,22 @@ body{background-image:none;}
                     <label class="field-label" for="igg-input">IgG</label>
                     <input class="field-input" id="igg-input" type="text" placeholder="e.g. Positive / Negative" autocomplete="off">
                   </div>
+                  <div class="field-group field-full">
+                    <label class="field-label" for="clin-note-input">Doctor / Med Tech note</label>
+                    <textarea class="field-input" id="clin-note-input" rows="3" placeholder="Remarks, interpretation, or follow-up instructions" style="min-height:64px;"></textarea>
+                  </div>
                 </div>
               </div>
             </div>
             <div id="result-severity" style="display:none;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:12px;"></div>
+            <div id="save-download-choice" style="margin-bottom:12px;">
+              <div style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">When saving, also download</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <label class="dl-opt"><input type="radio" name="save-dl" value="none" checked onchange="setSaveDownload(this.value)"><span>Nothing</span></label>
+                <label class="dl-opt"><input type="radio" name="save-dl" value="pdf" onchange="setSaveDownload(this.value)"><span>PDF report</span></label>
+                <label class="dl-opt"><input type="radio" name="save-dl" value="image" onchange="setSaveDownload(this.value)"><span>Annotated image</span></label>
+              </div>
+            </div>
             <button class="btn-primary-sm" onclick="saveAnalysisToSupabase()" id="btn-save-analysis" style="display:none;">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5"/></svg>
               Save to History
@@ -1564,18 +1585,19 @@ body{background-image:none;}
             <button onclick="showAllHistory()" style="background:var(--warm-gray);border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-ui);transition:background .18s;" onmouseover="this.style.background='#ddd'" onmouseout="this.style.background='var(--warm-gray)'">All History</button>
           </div>
         </div>
-        <table class="data-table">
+        <div class="hist-scroll"><table class="data-table">
           <thead>
             <tr>
               <th>Date &amp; Time</th>
               <th style="text-align:center;">Image</th>
+              <th>Patient / Tests</th>
               <th style="text-align:center;">Platelet Count</th>
               <th style="text-align:center;">Status</th>
               <th style="text-align:center;">Action</th>
             </tr>
           </thead>
-          <tbody id="history-body"><tr id="history-empty-row"><td colspan="5" style="border:none;padding:0;"><div class="empty-state" id="history-empty-state"><div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="16" cy="16" r="13"/><circle cx="16" cy="16" r="6"/><path d="M16 9V7M16 25v-2M9 16H7M25 16h-2"/></svg></div><h3>No tests recorded yet</h3><p>Run your first image analysis to see platelet history here.</p><button class="btn-primary-sm" onclick="switchTab('analysis')" style="margin-top:4px;">Go to Image Analysis</button></div></td></tr></tbody>
-        </table>
+          <tbody id="history-body"><tr id="history-empty-row"><td colspan="6" style="border:none;padding:0;"><div class="empty-state" id="history-empty-state"><div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="16" cy="16" r="13"/><circle cx="16" cy="16" r="6"/><path d="M16 9V7M16 25v-2M9 16H7M25 16h-2"/></svg></div><h3>No tests recorded yet</h3><p>Run your first image analysis to see platelet history here.</p><button class="btn-primary-sm" onclick="switchTab('analysis')" style="margin-top:4px;">Go to Image Analysis</button></div></td></tr></tbody>
+        </table></div>
       </div>
     </div>
 
@@ -2626,11 +2648,19 @@ function closeLightbox() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
+function _hEsc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _histMetaHtml(r) {
+  const name = r.patient ? `<div class="hm-name">${_hEsc(r.patient)}</div>` : `<div class="hm-name" style="font-weight:500;color:var(--mid-gray);">No patient</div>`;
+  const hasTests = r.ns1 || r.igm || r.igg;
+  const tests = hasTests ? `<div class="hm-tests">NS1: ${_hEsc(r.ns1 || '—')} · IgM: ${_hEsc(r.igm || '—')} · IgG: ${_hEsc(r.igg || '—')}</div>` : '';
+  const note = r.note ? `<div class="hm-note">“${_hEsc(r.note)}”</div>` : '';
+  return name + tests + note;
+}
 function renderHistory() {
   const tbody = document.getElementById("history-body");
   if (!tbody) return;
   if (historyRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:28px 0;font-size:13px;">No records found for this date.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:28px 0;font-size:13px;">No records found for this date.</td></tr>`;
     return;
   }
   tbody.innerHTML = historyRows.map((r, i) => {
@@ -2644,10 +2674,12 @@ function renderHistory() {
              onerror="this.parentElement.innerHTML='<span style=\'font-size:11px;color:var(--text-muted)\'>No image</span>'">
          </td>`
       : `<td style="text-align:center;"><span style="font-size:11px;color:var(--mid-gray);">—</span></td>`;
+    const metaCell = `<td><div class="hist-meta">${_histMetaHtml(r)}</div></td>`;
     return `
     <tr>
       <td>${formatHistoryDate(r.date)}&nbsp;&nbsp;${r.time}</td>
       ${thumbCell}
+      ${metaCell}
       <td style="text-align:center;">${r.count}</td>
       <td style="text-align:center;"><span style="${getStatusStyle(r.level)}">${r.status}</span></td>
       <td style="text-align:center;">
@@ -3707,12 +3739,20 @@ function getClinicalExtras() {
     useTests: on,
     ns1: on ? v('ns1-input') : '',
     igm: on ? v('igm-input') : '',
-    igg: on ? v('igg-input') : ''
+    igg: on ? v('igg-input') : '',
+    note: on ? v('clin-note-input') : ''
   };
 }
 function resetClinicalExtras() {
-  ['patient-name-input','ns1-input','igm-input','igg-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['patient-name-input','ns1-input','igm-input','igg-input','clin-note-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
 }
+function setSaveDownload(v) { try { localStorage.setItem('pw_save_download', v); } catch(e) {} }
+(function initSaveDownload() {
+  let v = 'none';
+  try { v = localStorage.getItem('pw_save_download') || 'none'; } catch(e) {}
+  const r = document.querySelector('input[name="save-dl"][value="' + v + '"]');
+  if (r) r.checked = true;
+})();
 (function initDoctorToggle() {
   let on = true;
   try { on = localStorage.getItem('pw_use_doctor_suggestions') !== '0'; } catch(e) {}
@@ -3746,14 +3786,22 @@ async function saveAnalysisToSupabase() {
     est_count_per_ul: estPerUl,
     severity: severity,
   };
+  const noteRow  = { clinician_note: extras.note || null };
   const extraRow = { patient_name: extras.patient || null, ns1_antigen: extras.ns1 || null, dengue_igm: extras.igm || null, dengue_igg: extras.igg || null };
-  let { data: insertedRow, error } = await _supabase.from('platelet_analyses').insert({ ...baseRow, ...extraRow }).select().single();
-  if (error && /column|schema cache/i.test(error.message || '')) {
-    // Table doesn't have the new columns yet — save the core result so nothing is lost.
-    console.warn('Extra columns missing in platelet_analyses; saving core result only.', error);
-    ({ data: insertedRow, error } = await _supabase.from('platelet_analyses').insert(baseRow).select().single());
-    if (!error) showErrorModal('Saved (without patient/test fields)', 'Your count was saved, but the database is missing the columns patient_name, ns1_antigen, dengue_igm and dengue_igg. Add them to the platelet_analyses table to store these fields.');
+  // Try the full row first; if the table lacks newer columns, retry with fewer so the count itself is never lost.
+  const attempts = [
+    { row: { ...baseRow, ...extraRow, ...noteRow }, dropped: [] },
+    { row: { ...baseRow, ...extraRow }, dropped: ['clinician_note'] },
+    { row: baseRow, dropped: ['patient_name', 'ns1_antigen', 'dengue_igm', 'dengue_igg', 'clinician_note'] },
+  ];
+  let insertedRow = null, error = null, droppedCols = [];
+  for (const at of attempts) {
+    ({ data: insertedRow, error } = await _supabase.from('platelet_analyses').insert(at.row).select().single());
+    if (!error) { droppedCols = at.dropped; break; }
+    if (!/column|schema cache/i.test(error.message || '')) break;
+    console.warn('Insert failed (missing column?), retrying with fewer fields.', error);
   }
+  if (!error && droppedCols.length) showErrorModal('Saved (some fields not stored)', 'Your count was saved, but these columns are missing from the platelet_analyses table, so their values were not stored: ' + droppedCols.join(', ') + '.');
   if (error) {
     console.error('Save error:', error);
     showErrorModal('Save Failed', 'Error saving analysis: ' + error.message);
@@ -3762,10 +3810,13 @@ async function saveAnalysisToSupabase() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null });
+    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note });
     historyRows = [...ALL_HISTORY_ROWS];
     renderHistory();
     if (typeof Chart !== 'undefined') updatePlateletChart();
+    const dlChoice = document.querySelector('input[name="save-dl"]:checked')?.value || 'none';
+    if (dlChoice === 'pdf') setTimeout(() => exportPDF(), 250);
+    else if (dlChoice === 'image') setTimeout(() => exportAnnotatedImage(), 250);
   }
   setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5"/></svg> Save to History'; }, 2000);
 }
@@ -3946,6 +3997,17 @@ async function exportPDF() {
           doc.text(t[1] || '________', tx + 3, y + 12);
         });
         y += 22;
+        if (_ex.note) {
+          doc.setFont('helvetica','normal'); doc.setFontSize(8);
+          const nl = doc.splitTextToSize(_ex.note, W - mg*2 - 8).slice(0, 6);
+          const nh = 9 + nl.length * 4;
+          doc.setFillColor(255,248,231); doc.setDrawColor(245,200,66); doc.rect(mg, y, W - mg*2, nh, 'FD');
+          doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(122,82,0);
+          doc.text('DOCTOR / MED TECH NOTE', mg + 4, y + 5);
+          doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(26,6,8);
+          doc.text(nl, mg + 4, y + 10);
+          y += nh + 6;
+        }
       }
       const imgEl = document.getElementById('preview-img');
       if (imgEl && imgEl.src && imgEl.src.length > 10 && !imgEl.src.endsWith('#')) {
@@ -4236,7 +4298,7 @@ async function loadAnalysisHistory() {
       const dt = new Date(a.created_at);
       const dateStr = dt.toISOString().split('T')[0];
       const timeStr = dt.toTimeString().slice(0, 5);
-      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null });
+      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '' });
     });
   }
   historyRows = [...ALL_HISTORY_ROWS];
