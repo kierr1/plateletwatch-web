@@ -381,6 +381,30 @@
     .modal { padding:22px 18px 20px; }
     .modal-grid-3, .modal-grid-2 { grid-template-columns:1fr; }
   }
+  /* ── Terms / Privacy modal ── */
+  .legal-overlay { display:none; position:fixed; inset:0; background:rgba(26,15,15,.55); backdrop-filter:blur(4px); z-index:1100; align-items:center; justify-content:center; padding:16px; }
+  .legal-overlay.show { display:flex; }
+  .legal-modal { background:var(--white); border-radius:var(--r-lg); width:100%; max-width:640px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 32px 80px rgba(185,28,28,.22), 0 4px 20px rgba(0,0,0,.12); animation: modalIn .35s cubic-bezier(.22,1,.36,1) both; overflow:hidden; }
+  .legal-head { padding:22px 26px 0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .legal-head h2 { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-.01em; }
+  .legal-head p { font-size:12px; color:var(--gray-3); margin-top:3px; }
+  .legal-close { background:none; border:1px solid var(--gray-2); border-radius:50%; width:32px; height:32px; flex-shrink:0; cursor:pointer; font-size:18px; line-height:1; color:var(--gray-3); transition:all .15s; }
+  .legal-close:hover { color:var(--red-main); border-color:var(--red-main); }
+  .legal-tabs { display:flex; gap:4px; padding:14px 26px 0; border-bottom:1px solid var(--gray-2); }
+  .legal-tab { background:none; border:none; padding:9px 14px; font:inherit; font-size:13px; font-weight:600; color:var(--gray-3); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s; }
+  .legal-tab:hover { color:var(--text); }
+  .legal-tab.active { color:var(--red-main); border-bottom-color:var(--red-main); }
+  .legal-body { padding:18px 26px 8px; overflow-y:auto; font-size:13px; line-height:1.7; color:var(--text); -webkit-overflow-scrolling:touch; }
+  .legal-body h3 { font-size:13.5px; font-weight:700; margin:18px 0 5px; color:var(--text); }
+  .legal-body h3:first-child { margin-top:0; }
+  .legal-body p, .legal-body li { color:var(--gray-3); overflow-wrap:anywhere; }
+  .legal-body p { margin-bottom:6px; }
+  .legal-body ul { padding-left:18px; margin-bottom:6px; }
+  .legal-body li { margin-bottom:3px; }
+  .legal-note { background:#fff8e7; border:1px solid #f5c842; border-radius:10px; padding:10px 12px; font-size:12px; color:#7a5200 !important; margin-bottom:10px; }
+  .legal-foot { padding:14px 26px 20px; display:flex; justify-content:flex-end; border-top:1px solid var(--gray-2); }
+  .legal-foot .btn-primary { width:auto; padding:11px 26px; margin:0; }
+  @media (max-width:520px) { .legal-head, .legal-tabs, .legal-body, .legal-foot { padding-left:18px; padding-right:18px; } .legal-modal { max-height:94vh; } }
 </style>
 </head>
 <body>
@@ -475,9 +499,110 @@
     <p class="bottom-note">Don't have an account? <a href="/register">Create one now</a></p>
 
     <p class="legal">
-      By signing in, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.<br>
+      By signing in, you agree to our <a href="#" onclick="openLegal('terms');return false;">Terms of Service</a> and <a href="#" onclick="openLegal('privacy');return false;">Privacy Policy</a>.<br>
       Your data is encrypted and never sold.
     </p>
+  </div>
+</div>
+
+<!-- Terms of Service / Privacy Policy -->
+<div class="legal-overlay" id="legal-modal" role="dialog" aria-modal="true" aria-labelledby="legal-title" onclick="if(event.target===this)closeLegal()">
+  <div class="legal-modal">
+    <div class="legal-head">
+      <div>
+        <h2 id="legal-title">Terms of Service</h2>
+        <p>PlateletWatch · Last updated October 6, 2026</p>
+      </div>
+      <button type="button" class="legal-close" onclick="closeLegal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="legal-tabs" role="tablist">
+      <button type="button" class="legal-tab active" id="legal-tab-terms" role="tab" onclick="openLegal('terms')">Terms of Service</button>
+      <button type="button" class="legal-tab" id="legal-tab-privacy" role="tab" onclick="openLegal('privacy')">Privacy Policy</button>
+    </div>
+    <div class="legal-body" id="legal-body-terms">
+      <p class="legal-note"><strong>Important:</strong> PlateletWatch is an early screening and educational tool. It does not provide a medical diagnosis and does not replace a licensed healthcare professional.</p>
+
+      <h3>1. Acceptance of these terms</h3>
+      <p>By creating an account or signing in to PlateletWatch, you agree to these Terms of Service and to our Privacy Policy. If you do not agree, please do not use the service.</p>
+
+      <h3>2. What PlateletWatch does</h3>
+      <p>PlateletWatch uses AI to detect and count platelets, red blood cells and white blood cells in microscope images of blood smears, estimates a platelet count per µL, and compares it with WHO dengue severity thresholds. You can also record confirmatory test results (such as NS1 antigen and Dengue IgM/IgG) and notes from a doctor or medical technologist.</p>
+
+      <h3>3. Not medical advice</h3>
+      <ul>
+        <li>Results are estimates and may be inaccurate, especially with poor image quality, focus, lighting or staining.</li>
+        <li>Do not start, stop or change any treatment based only on this app.</li>
+        <li>If you or someone else shows dengue warning signs (severe abdominal pain, persistent vomiting, bleeding, drowsiness or restlessness, difficulty breathing) or the app reports a Danger or Critical result, seek medical care immediately.</li>
+      </ul>
+
+      <h3>4. Your account</h3>
+      <p>You must provide accurate information and keep your login details private. You are responsible for activity under your account. For security, repeated incorrect password attempts temporarily lock sign-in, and inactive sessions are signed out automatically.</p>
+
+      <h3>5. Acceptable use</h3>
+      <ul>
+        <li>Upload only images and enter only patient information that you are authorized to use, with the patient’s consent where required.</li>
+        <li>Do not use the service for unlawful purposes, to harm others, or to attempt to break, overload or gain unauthorized access to it.</li>
+        <li>Do not copy, resell or reverse-engineer the service except as allowed by law.</li>
+      </ul>
+
+      <h3>6. Your content</h3>
+      <p>You keep ownership of the images and information you submit. You allow PlateletWatch to store and process them only to provide the service to you, such as analysis, history, and report or image export.</p>
+
+      <h3>7. Availability and liability</h3>
+      <p>The service is provided “as is” and “as available”. We do not guarantee uninterrupted or error-free operation. To the extent permitted by law, PlateletWatch and its developers are not liable for any loss or harm arising from use of, or reliance on, the results.</p>
+
+      <h3>8. Suspension and termination</h3>
+      <p>We may suspend or close accounts that break these terms or put the service or other users at risk. You may stop using the service and request deletion of your account at any time.</p>
+
+      <h3>9. Changes to these terms</h3>
+      <p>We may update these terms from time to time. Continued use after an update means you accept the revised terms.</p>
+
+      <h3>10. Governing law and contact</h3>
+      <p>These terms are governed by the laws of the Republic of the Philippines. Questions? Contact the PlateletWatch team at <strong>shernanayceemataiii@gmail.com</strong>.</p>
+    </div>
+    <div class="legal-body" id="legal-body-privacy" style="display:none;">
+      <p class="legal-note"><strong>In short:</strong> we collect only what is needed to run PlateletWatch, we protect it, and we never sell it.</p>
+
+      <h3>1. Information we collect</h3>
+      <ul>
+        <li><strong>Account details:</strong> name, email address, and profile details you provide (for example birthdate and address).</li>
+        <li><strong>Health-related information:</strong> microscope images, platelet / RBC / WBC counts, estimated counts and severity, patient names, NS1 and Dengue IgM/IgG results, and doctor or medical technologist notes that you enter.</li>
+        <li><strong>Sign-in information:</strong> sign-in events and the sign-in method used (email or Google).</li>
+        <li><strong>On your device:</strong> small items stored in your browser, such as your preferences, the sign-in attempt counter, and session information.</li>
+      </ul>
+
+      <h3>2. How we use it</h3>
+      <ul>
+        <li>To create and secure your account and sign you in.</li>
+        <li>To analyze images, calculate results, and keep your test history.</li>
+        <li>To produce the PDF reports and annotated images that you request.</li>
+        <li>To maintain and improve the reliability and safety of the service.</li>
+      </ul>
+
+      <h3>3. Sensitive personal information</h3>
+      <p>Health information is treated as sensitive personal information under the Data Privacy Act of 2012 (Republic Act No. 10173). By entering patient details, you confirm that you have the right and the consent needed to do so.</p>
+
+      <h3>4. Storage and security</h3>
+      <p>Your data is stored with our cloud database and storage provider (Supabase) and sent over encrypted connections. Access is limited to your signed-in account. No system is completely secure, so please keep your password private and sign out on shared devices.</p>
+
+      <h3>5. Sharing</h3>
+      <p>We do not sell your personal information. We share it only with service providers that help run the app (such as hosting and, if you choose it, Google sign-in), when required by law, or when you choose to export or share a report yourself.</p>
+
+      <h3>6. Retention and deletion</h3>
+      <p>We keep your records until you delete them or your account is removed. Deleting a record from History removes it from your account.</p>
+
+      <h3>7. Your rights</h3>
+      <p>You may ask to access, correct or delete your personal data, object to or restrict its processing, and withdraw your consent. You also have the right to file a complaint with the National Privacy Commission of the Philippines.</p>
+
+      <h3>8. Age</h3>
+      <p>PlateletWatch is intended for adults, including healthcare students and professionals. If you are under 18, please use it only with a parent or guardian.</p>
+
+      <h3>9. Changes and contact</h3>
+      <p>We may update this policy and will change the date above when we do. For privacy questions or requests, contact <strong>shernanayceemataiii@gmail.com</strong>.</p>
+    </div>
+    <div class="legal-foot">
+      <button type="button" class="btn-primary" onclick="closeLegal()">I understand</button>
+    </div>
   </div>
 </div>
 
@@ -713,6 +838,29 @@
     pw.type = showing ? 'text' : 'password';
     animateEyeToggle(btn || event.currentTarget, showing);
   }
+
+  // ── Terms of Service / Privacy Policy modal ─────────────────────────
+  let _legalReturnFocus = null;
+  function openLegal(which) {
+    which = which === 'privacy' ? 'privacy' : 'terms';
+    const modal = document.getElementById('legal-modal');
+    if (!modal.classList.contains('show')) _legalReturnFocus = document.activeElement;
+    document.getElementById('legal-title').textContent = which === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
+    ['terms', 'privacy'].forEach(k => {
+      document.getElementById('legal-body-' + k).style.display = (k === which) ? '' : 'none';
+      document.getElementById('legal-tab-' + k).classList.toggle('active', k === which);
+    });
+    document.getElementById('legal-body-' + which).scrollTop = 0;
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.legal-close').focus();
+  }
+  function closeLegal() {
+    document.getElementById('legal-modal').classList.remove('show');
+    document.body.style.overflow = '';
+    if (_legalReturnFocus && _legalReturnFocus.focus) _legalReturnFocus.focus();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('legal-modal').classList.contains('show')) closeLegal(); });
 
   // ── Show alert ──────────────────────────────────────────────────────
   function showAlert(msg, type = 'error', showResend = false) {
