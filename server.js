@@ -25,76 +25,16 @@ const DEFAULT_DAILY_LIMIT = 30; // messages/day per user if no row exists yet
 async function checkAndConsumeQuota(authHeader) {
   const token = (authHeader || '').replace(/^Bearer\s+/i, '');
   if (!token) return { ok: false, status: 401, error: 'Not signed in.' };
-
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !user) {
-    // TEMPORARY: log the real reason so we can see it in Render's logs.
-    // Remove this console.error once the issue is fixed.
-    console.error('Auth check failed:', authErr?.message || 'no user returned', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      supabaseUrlSet: !!process.env.SUPABASE_URL,
-      serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    });
-    return { ok: false, status: 401, error: 'Invalid or expired session.' };
+  if (authErr || !user) return { ok: false, status: 401, error: 'Invalid or expired session.' };
+
+  const { data, error } = await supabaseAdmin.rpc('consume_chat_quota', { p_user_id: user.id });
+  if (error) {
+    console.error('Chat quota RPC failed:', error.message);
+    return { ok: false, status: 500, error: 'Chat quota service unavailable.' };
   }
-
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-  let { data: usage, error: fetchErr } = await supabaseAdmin
-    .from('chat_usage')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (fetchErr) return { ok: false, status: 500, error: 'Quota lookup failed.' };
-
-  // No row yet -> create one with defaults
-  if (!usage) {
-    const { data: created, error: insertErr } = await supabaseAdmin
-      .from('chat_usage')
-      .insert({ user_id: user.id, messages_used: 0, daily_limit: DEFAULT_DAILY_LIMIT, last_reset_date: today })
-      .select()
-      .single();
-    if (insertErr) return { ok: false, status: 500, error: 'Could not create quota record.' };
-    usage = created;
-  }
-
-  // Reset counter if it's a new day
-  if (usage.last_reset_date !== today) {
-    usage.messages_used = 0;
-    usage.last_reset_date = today;
-  }
-
-  if (usage.messages_used >= usage.daily_limit) {
-    // Persist the reset even if they're over limit, so tomorrow starts clean
-    await supabaseAdmin.from('chat_usage').update({
-      messages_used: usage.messages_used,
-      last_reset_date: usage.last_reset_date,
-    }).eq('user_id', user.id);
-    return {
-      ok: false,
-      status: 429,
-      error: `You've used all ${usage.daily_limit} chat messages for today. Resets tomorrow.`,
-    };
-  }
-
-  // Consume one message from their quota
-  const { error: updateErr } = await supabaseAdmin
-    .from('chat_usage')
-    .update({
-      messages_used: usage.messages_used + 1,
-      last_reset_date: usage.last_reset_date,
-    })
-    .eq('user_id', user.id);
-
-  if (updateErr) return { ok: false, status: 500, error: 'Could not update quota.' };
-
-  return {
-    ok: true,
-    userId: user.id,
-    remaining: usage.daily_limit - (usage.messages_used + 1),
-  };
+  if (!data?.allowed) return { ok: false, status: 429, error: 'Daily chat message limit reached. Resets tomorrow (UTC).' };
+  return { ok: true, userId: user.id, remaining: data.remaining };
 }
 
 const app  = express();
@@ -154,7 +94,19 @@ app.get(Object.keys(HTML_REDIRECTS), (req, res) => {
 });
 
 // ── Static files ───────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname), { dotfiles: 'deny', index: false }));
+// Only allow known public assets, never the server source, lockfiles or migrations.
+app.use((req, res, next) => {
+  const p = decodeURIComponent(req.path).toLowerCase();
+  const basename = path.posix.basename(p);
+  if (/^\/(?:api)(?:\/|$)/.test(p)) return next();
+  if (/\.(?:js|css|html|png|jpg|jpeg|webp|svg|ico|woff2?|ttf)$/.test(basename)) {
+    if (basename === 'server.js' || basename === 'package-lock.json' || basename.endsWith('.config.json')) return res.sendStatus(404);
+    return next();
+  }
+  if (p === '/') return next();
+  return res.sendStatus(404);
+});
+app.use(express.static(path.join(__dirname), { dotfiles: 'deny', index: false, fallthrough: true }));
 app.use(express.json({ limit: '10mb' }));
 
 // ── Rate Limiters ─────────────────────────────────────────────────────
@@ -189,6 +141,45 @@ const chatLimiter = rateLimit({
 // in the page legitimately makes ~4 requests/second, which generalLimiter would block.
 app.use('/api/', (req, res, next) =>
   req.path.startsWith('/camera/') ? next() : generalLimiter(req, res, next));
+
+
+async function requireAuth(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const match = /^Bearer\\s+(.+)$/i.exec(header);
+    if (!match) return res.status(401).json({ error: 'Sign in required.' });
+    const { data, error } = await supabaseAdmin.auth.getUser(match[1]);
+    if (error || !data.user) return res.status(401).json({ error: 'Invalid or expired session.' });
+    req.user = data.user;
+    next();
+  } catch (err) {
+    return res.status(503).json({ error: 'Authentication service unavailable.' });
+  }
+}
+
+// A short-lived, one-use camera stream ticket lets an <img> display MJPEG
+// without placing the user's long-lived Supabase token in the URL.
+const { randomBytes } = require('crypto');
+const cameraTickets = new Map();
+app.post('/api/camera/stream-ticket', requireAuth, (req, res) => {
+  if (cameraTickets.size > 2000) {
+    for (const [key, ticket] of cameraTickets) {
+      if (ticket.expires < Date.now()) cameraTickets.delete(key);
+    }
+  }
+  if (cameraTickets.size > 2000) return res.status(429).json({ error: 'Too many stream tickets.' });
+  const ticket = randomBytes(32).toString('hex');
+  cameraTickets.set(ticket, { userId: req.user.id, expires: Date.now() + 30000 });
+  res.set('Cache-Control', 'no-store').json({ ticket });
+});
+function requireCameraTicket(req, res, next) {
+  const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
+  const entry = cameraTickets.get(ticket);
+  if (entry) cameraTickets.delete(ticket);
+  if (!entry || entry.expires < Date.now()) return res.status(401).json({ error: 'Camera authorization required.' });
+  req.user = { id: entry.userId };
+  next();
+}
 
 const cameraLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -237,7 +228,7 @@ async function relayCameraError(upstream, res) {
   return sendCameraError(res, upstream.status, e.detail || e.error || 'Raspberry Pi camera error.');
 }
 
-app.get('/api/camera/status', cameraLimiter, async (req, res) => {
+app.get('/api/camera/status', requireAuth, cameraLimiter, async (req, res) => {
   try {
     const r = await fetch(`${INFERENCE_URL}/api/camera/status`, { signal: AbortSignal.timeout(5000) });
     if (!r.ok) return relayCameraError(r, res);
@@ -247,7 +238,7 @@ app.get('/api/camera/status', cameraLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/camera/snapshot', cameraLimiter, async (req, res) => {
+app.get('/api/camera/snapshot', requireAuth, cameraLimiter, async (req, res) => {
   try {
     const r = await fetch(`${INFERENCE_URL}/api/camera/snapshot`, { signal: AbortSignal.timeout(15000) });
     if (!r.ok) return relayCameraError(r, res);
@@ -258,7 +249,7 @@ app.get('/api/camera/snapshot', cameraLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/camera/stream', cameraLimiter, async (req, res) => {
+app.get('/api/camera/stream', requireCameraTicket, cameraLimiter, async (req, res) => {
   if (activeCameraStreams >= MAX_CAMERA_STREAMS) {
     return sendCameraError(res, 429, 'The camera is already being viewed by the maximum number of people. Try again shortly.');
   }
@@ -294,7 +285,7 @@ app.get('/api/camera/stream', cameraLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/analyze-image', aiLimiter, async (req, res) => {
+app.post('/api/analyze-image', requireAuth, aiLimiter, async (req, res) => {
   const { image, mediaType, zoom, confidence } = req.body;
 
   if (!image || typeof image !== 'string') {
