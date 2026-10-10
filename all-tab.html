@@ -539,10 +539,22 @@ body{background-image:radial-gradient(var(--warm-gray) 1px,transparent 1px);back
 .capture-source-status .dot{width:7px;height:7px;border-radius:50%;background:#9ca3af;flex-shrink:0;}
 .capture-source-status.ok .dot{background:#16a34a;}
 .capture-source-status.bad .dot{background:#dc2626;}
-.camera-viewport img#camera-rpi-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000;}
+/* inline live view from the Pi camera (replaces the drop zone while "Raspberry Pi camera" is selected) */
+.rpi-live{position:relative;display:none;width:100%;aspect-ratio:16/9;max-height:480px;background:#000;border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--warm-gray);margin-bottom:16px;}
+.rpi-live img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;}
+.rpi-live-tag{position:absolute;top:12px;left:12px;z-index:3;font-size:9px;font-weight:700;color:#22D3EE;background:rgba(10,13,20,.75);border:1px solid rgba(34,211,238,.3);border-radius:var(--radius-sm);padding:3px 8px;letter-spacing:.5px;text-transform:uppercase;}
+.rpi-live-tag.off{color:#9ca3af;border-color:rgba(156,163,175,.3);}
+.rpi-live-msg{position:absolute;inset:0;z-index:4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:rgba(255,255,255,.65);background:rgba(10,13,20,.88);}
+.rpi-live-msg strong{color:#fff;font-size:15px;}
+.rpi-live-msg p{font-size:12px;line-height:1.6;max-width:360px;margin:0;}
+.rpi-live-msg button{margin-top:4px;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 16px;font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer;}
+.rpi-live::after{content:"";position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;}
+.rpi-live.flash::after{animation:rpiflash .35s ease-out;}
+@keyframes rpiflash{0%{opacity:.85}100%{opacity:0}}
 body.dark-mode .capture-source-seg{background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.1)!important;}
 body.dark-mode .cs-opt:not(.active){color:#b4bccf!important;}
 body.dark-mode .cs-opt:not(.active):hover{background:rgba(255,255,255,.08)!important;}
+body.dark-mode .rpi-live{border-color:rgba(255,255,255,.1)!important;}
 @media(max-width:520px){.capture-source-row{flex-direction:column;align-items:stretch;}.capture-source-seg{display:flex;}.cs-opt{flex:1;justify-content:center;}}
 
 /* ── CROP MODAL ────────────────────────────────────────────────────── */
@@ -1397,6 +1409,16 @@ body{background-image:none;}
           <strong id="upload-zone-text">Drop microscope image here</strong>
           <span id="upload-zone-sub">JPG, PNG, TIFF · max 20 MB · 40× or 100× field recommended</span>
         </div>
+        <div class="rpi-live" id="rpi-live" aria-label="Live view from the Raspberry Pi camera">
+          <img id="rpi-live-img" alt="Live view from the Raspberry Pi camera" decoding="async">
+          <div class="rpi-live-tag off" id="rpi-live-tag">● Connecting…</div>
+          <div class="rpi-live-msg" id="rpi-live-msg" role="alert">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <strong id="rpi-live-msg-title">Pi camera unavailable</strong>
+            <p id="rpi-live-msg-text"></p>
+            <button type="button" onclick="retryRpiLive()">Retry</button>
+          </div>
+        </div>
         <div id="image-preview-area" style="display:none;position:relative;margin-bottom:16px;border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--warm-gray);">
           <img id="preview-img" src="" alt="Uploaded microscope image" style="width:100%;max-height:400px;object-fit:contain;background:#0a0d14;display:block;">
           <button onclick="clearImage()" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;" aria-label="Remove image">&times;</button>
@@ -1818,13 +1840,12 @@ body{background-image:none;}
     <div class="camera-modal-head">
       <div class="camera-modal-title">
         <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="2.5"/><path d="M1.5 5V4C1.5 3.172 2.172 2.5 3 2.5H4.5L5.5 1H8.5L9.5 2.5H11C11.828 2.5 12.5 3.172 12.5 4V10C12.5 10.828 11.828 11.5 11 11.5H3C2.172 11.5 1.5 10.828 1.5 10V7"/></svg>
-        <span id="camera-modal-title-text">Capture from Microscope</span>
+        Capture from Microscope
       </div>
       <button class="camera-modal-close" onclick="closeCameraModal()" aria-label="Close">✕</button>
     </div>
     <div class="camera-viewport">
       <video id="camera-video" autoplay playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
-      <img id="camera-rpi-img" alt="Live view from the Raspberry Pi camera" decoding="async">
       <canvas id="camera-canvas"></canvas>
       <div class="camera-scan-line" id="camera-scan-line"></div>
       <div class="camera-crosshair" id="camera-crosshair">
@@ -2843,9 +2864,11 @@ function handleCameraCapture(e) {
   if (!file) return;
   showImagePreview(file);
 }
-function showImagePreview(file) {
+function showImagePreview(file, opts) {
+  const skipCrop = !!(opts && opts.skipCrop);   // Pi camera frames are already framed by the fixed microscope setup
   currentImageFile = file;
-  _imageCropped = false; // every newly captured/uploaded image must be reviewed in the crop step before analysis
+  _imageCropped = skipCrop; // every other captured/uploaded image must be reviewed in the crop step before analysis
+  if (typeof _rpiSync === 'function') _rpiSync();
   hideSmearGateOverlay();
   // Clear any leftover bounding boxes / detections from a previous image so
   // a rejected (or different) image never shows stale platelet markers.
@@ -2864,7 +2887,7 @@ function showImagePreview(file) {
     document.getElementById('analysis-result').style.display = 'none';
     document.getElementById('btn-save-analysis').style.display = 'none';
     // Sequence: always ask the user to crop the photo before it can be analyzed.
-    openCropModal(ev.target.result);
+    if (!skipCrop) openCropModal(ev.target.result);
   };
   reader.readAsDataURL(file);
 }
@@ -3036,24 +3059,27 @@ function clearImage() {
   if (addFieldBtn) addFieldBtn.style.display = 'none';
 }
 
-// ── Capture source: phone camera (browser) vs Raspberry Pi USB camera (server) ──
-// 'phone' → getUserMedia in this browser (original behaviour).
-// 'rpi'   → live MJPEG view from the Pi's USB camera via /api/camera/stream; the capture
-//           button grabs a full-resolution frame from /api/camera/snapshot. Either way the
-//           result becomes a File and goes through the same crop → analyse flow.
+// ── Capture source: phone camera (browser popup) vs Raspberry Pi USB camera (inline) ──
+// 'phone' → the original popup using getUserMedia in this browser.
+// 'rpi'   → no popup: the drop zone is replaced by a live MJPEG view from the Pi's USB camera
+//           (/api/camera/stream). "Capture" grabs a full-resolution frame (/api/camera/snapshot),
+//           shows it in the normal preview and it is ready for "Count Platelets" straight away.
 const CAMERA_API = '/api/camera';
 let _captureSource = 'phone';
 try { if (localStorage.getItem('pw_capture_source') === 'rpi') _captureSource = 'rpi'; } catch (_) {}
+let _rpiRunning = false;
+let _rpiToken = 0;
 let _rpiPollTimer = null;
 let _rpiFallbackTimer = null;
 let _rpiPollUrl = null;
-let _rpiLiveToken = 0;
+let _curTab = ((document.querySelector('.panel.active') || {}).id === 'panel-analysis') ? 'analysis' : 'other';
 
 function setCaptureSource(src) {
   _captureSource = (src === 'rpi') ? 'rpi' : 'phone';
   try { localStorage.setItem('pw_capture_source', _captureSource); } catch (_) {}
   _syncCaptureSourceUI();
   if (_captureSource === 'rpi') checkRpiCamera();
+  _rpiSync();
 }
 
 function _syncCaptureSourceUI() {
@@ -3064,12 +3090,16 @@ function _syncCaptureSourceUI() {
     bPhone.classList.toggle('active', !rpi); bPhone.setAttribute('aria-checked', String(!rpi));
     bRpi.classList.toggle('active', rpi);    bRpi.setAttribute('aria-checked', String(rpi));
   }
-  const label = document.getElementById('capture-btn-label');
-  if (label) label.textContent = rpi ? 'Capture from Pi camera' : 'Capture from phone camera';
-  const title = document.getElementById('camera-modal-title-text');
-  if (title) title.textContent = rpi ? 'Capture from Raspberry Pi Camera' : 'Capture from Microscope';
   const st = document.getElementById('cs-rpi-status');
   if (st) st.style.display = rpi ? 'inline-flex' : 'none';
+  _updateCaptureBtnLabel();
+}
+
+function _updateCaptureBtnLabel() {
+  const label = document.getElementById('capture-btn-label');
+  if (!label) return;
+  if (_captureSource !== 'rpi') label.textContent = 'Capture from phone camera';
+  else label.textContent = currentImageFile ? 'Retake from Pi camera' : 'Capture from Pi camera';
 }
 
 async function checkRpiCamera() {
@@ -3092,39 +3122,73 @@ async function checkRpiCamera() {
   }
 }
 
-function _stopRpiStream() {
-  _rpiLiveToken++;
+// What should be on screen right now?
+//  • panel visible : Pi source selected and no photo is being previewed/analysed
+//  • stream running: panel visible AND the Image Analysis tab is open AND the browser tab is in view
+//    (so the Pi isn't streaming to a page nobody is looking at)
+function _rpiSync() {
+  const panel = document.getElementById('rpi-live');
+  const zone  = document.getElementById('upload-zone');
+  if (!panel || !zone) return;
+  const show = _captureSource === 'rpi' && !currentImageFile;
+  panel.style.display = show ? 'block' : 'none';
+  if (show) zone.style.display = 'none';
+  else if (!currentImageFile) zone.style.display = '';
+  const run = show && _curTab === 'analysis' && !document.hidden;
+  if (run && !_rpiRunning) _startRpiStream();
+  else if (!run && _rpiRunning) _stopRpiStream();
+  _updateCaptureBtnLabel();
+}
+
+function _rpiMsg(title, text) {
+  const m = document.getElementById('rpi-live-msg');
+  if (!m) return;
+  if (!title) { m.style.display = 'none'; return; }
+  document.getElementById('rpi-live-msg-title').textContent = title;
+  document.getElementById('rpi-live-msg-text').textContent  = text || '';
+  m.style.display = 'flex';
+  const tag = document.getElementById('rpi-live-tag');
+  tag.textContent = '● OFFLINE'; tag.classList.add('off');
+}
+
+function _rpiTagLive(on) {
+  const tag = document.getElementById('rpi-live-tag');
+  if (!tag) return;
+  tag.textContent = on ? '● LIVE · PI' : '● Connecting…';
+  tag.classList.toggle('off', !on);
+}
+
+function _rpiClearTimers() {
   if (_rpiPollTimer) { clearInterval(_rpiPollTimer); _rpiPollTimer = null; }
   if (_rpiFallbackTimer) { clearTimeout(_rpiFallbackTimer); _rpiFallbackTimer = null; }
   if (_rpiPollUrl) { URL.revokeObjectURL(_rpiPollUrl); _rpiPollUrl = null; }
-  const img = document.getElementById('camera-rpi-img');
-  if (img) { img.onload = null; img.onerror = null; img.removeAttribute('src'); img.style.display = 'none'; }
 }
 
-async function initRpiCamera() {
-  const video     = document.getElementById('camera-video');
-  const img       = document.getElementById('camera-rpi-img');
-  const errDiv    = document.getElementById('camera-err');
-  const scanLine  = document.getElementById('camera-scan-line');
-  const crosshair = document.getElementById('camera-crosshair');
-  const liveTag   = document.getElementById('camera-live-tag');
-  const lockBtn   = document.getElementById('cam-lock-btn');
-  const flipBtn   = document.getElementById('cam-switch-btn');
-  const token = ++_rpiLiveToken;
-  video.style.display = 'none';
-  if (lockBtn) lockBtn.style.display = 'none';
-  if (flipBtn) flipBtn.style.display = 'none';       // no front/back camera on the Pi
-  errDiv.style.display = 'none';
-  scanLine.style.display = ''; crosshair.style.display = ''; liveTag.style.display = '';
-  liveTag.textContent = '● LIVE · PI'; liveTag.style.color = '#22D3EE';
+function _stopRpiStream() {
+  _rpiRunning = false;
+  _rpiToken++;
+  _rpiClearTimers();
+  const img = document.getElementById('rpi-live-img');
+  if (img) { img.onload = null; img.onerror = null; img.removeAttribute('src'); img.style.display = 'none'; }   // dropping src closes the MJPEG connection
+  _rpiTagLive(false);
+}
+
+function retryRpiLive() { _stopRpiStream(); _rpiMsg(null); _rpiSync(); }
+
+async function _startRpiStream() {
+  const img = document.getElementById('rpi-live-img');
+  const token = ++_rpiToken;
+  _rpiRunning = true;
+  _rpiMsg(null);
+  _rpiTagLive(false);
 
   const status = await checkRpiCamera();
-  if (token !== _rpiLiveToken) return;               // modal closed / source changed meanwhile
-  if (!status) { _showCameraError('Pi Camera Unreachable', 'The page could not reach the Raspberry Pi camera. Make sure the Pi is on and inference_server.py is running, or switch to Phone camera.'); return; }
-  if (!status.available) { _showCameraError('Pi Camera Not Available', status.reason || 'No USB camera was found on the Raspberry Pi.'); return; }
+  if (token !== _rpiToken) return;                    // stopped / restarted meanwhile
+  if (!status) { _rpiMsg('Pi Camera Unreachable', 'Could not reach the Raspberry Pi camera. Make sure the Pi is on and inference_server.py is running, or switch to Phone camera.'); return; }
+  if (!status.available) { _rpiMsg('Pi Camera Not Available', status.reason || 'No USB camera was found on the Raspberry Pi.'); return; }
 
   const startPolling = () => {
-    if (token !== _rpiLiveToken || _rpiPollTimer) return;
+    if (token !== _rpiToken || _rpiPollTimer) return;
     // Fallback for proxies that buffer multipart streams: fetch ~4 snapshots per second instead.
     let busy = false, fails = 0;
     _rpiPollTimer = setInterval(async () => {
@@ -3133,21 +3197,22 @@ async function initRpiCamera() {
         const r = await fetch(CAMERA_API + '/snapshot?t=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const url = URL.createObjectURL(await r.blob());
-        if (token !== _rpiLiveToken) { URL.revokeObjectURL(url); return; }
+        if (token !== _rpiToken) { URL.revokeObjectURL(url); return; }
         const old = _rpiPollUrl; _rpiPollUrl = url; img.src = url; img.style.display = 'block';
         if (old) URL.revokeObjectURL(old);
         fails = 0;
       } catch (e) {
-        if (++fails >= 4 && token === _rpiLiveToken) { _stopRpiStream(); _showCameraError('Pi Camera Stopped', 'The Raspberry Pi camera stopped responding. Tap Retry or switch to Phone camera.'); }
+        if (++fails >= 4 && token === _rpiToken) { _stopRpiStream(); _rpiRunning = true; _rpiMsg('Pi Camera Stopped', 'The Raspberry Pi camera stopped responding. Tap Retry or switch to Phone camera.'); }
       } finally { busy = false; }
     }, 250);
   };
 
+  img.onload  = () => { if (token === _rpiToken) { _rpiTagLive(true); _rpiMsg(null); } };
+  img.onerror = () => { if (token === _rpiToken && !_rpiPollTimer) startPolling(); };
   img.style.display = 'block';
-  img.onerror = () => { if (token === _rpiLiveToken && !_rpiPollTimer) startPolling(); };
   img.src = CAMERA_API + '/stream?t=' + Date.now();
   _rpiFallbackTimer = setTimeout(() => {              // no first frame after 5s → stream is probably being buffered
-    if (token === _rpiLiveToken && !img.naturalWidth) startPolling();
+    if (token === _rpiToken && !img.naturalWidth) startPolling();
   }, 5000);
 }
 
@@ -3161,36 +3226,47 @@ async function _grabRpiSnapshot() {
   return await r.blob();
 }
 
-async function captureRpiPhoto() {
-  const canvas     = document.getElementById('camera-canvas');
-  const captureBtn = document.getElementById('cam-capture-btn');
-  const useBtn     = document.getElementById('cam-use-btn');
-  const retakeBtn  = document.getElementById('cam-retake-btn');
-  const liveTag    = document.getElementById('camera-live-tag');
-  if (captureBtn.disabled) return;
-  captureBtn.disabled = true;
+let _rpiCapturing = false;
+async function captureRpiFrame() {
+  if (_rpiCapturing) return;
+  _rpiCapturing = true;
+  const btn = document.querySelector('.upload-controls > .btn-outline[onclick="startCameraCapture()"]');
+  if (btn) btn.disabled = true;
   try {
     const blob = await _grabRpiSnapshot();
-    const bmp = await createImageBitmap(blob);
-    canvas.width = bmp.width; canvas.height = bmp.height;
-    canvas.getContext('2d').drawImage(bmp, 0, 0);
-    if (bmp.close) bmp.close();
-    _capturedBlob = blob;
-    canvas.classList.add('show');
-    captureBtn.style.display = 'none';
-    useBtn.style.display     = 'flex';
-    retakeBtn.style.display  = '';
-    liveTag.textContent      = '● CAPTURED';
-    liveTag.style.color      = '#fbbf24';
+    const panel = document.getElementById('rpi-live');
+    if (panel) { panel.classList.remove('flash'); void panel.offsetWidth; panel.classList.add('flash'); }
+    const file = new File([blob], 'rpi_microscope_capture_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+    showImagePreview(file, { skipCrop: true });      // straight to preview; "Count Platelets" is ready
   } catch (e) {
     showErrorModal('Pi Camera Capture Failed', e.message || 'Could not grab a frame from the Raspberry Pi camera.');
   } finally {
-    captureBtn.disabled = false;
+    _rpiCapturing = false;
+    if (btn) btn.disabled = false;
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { _syncCaptureSourceUI(); if (_captureSource === 'rpi') checkRpiCamera(); });
-if (document.readyState !== 'loading') { _syncCaptureSourceUI(); if (_captureSource === 'rpi') checkRpiCamera(); }
+// The "Capture from Pi camera" button: capture when the live view is up, otherwise act as "Retake".
+function rpiCaptureButton() {
+  if (currentImageFile) { clearImage(); return; }      // clearImage → live view comes back
+  const msgUp = (document.getElementById('rpi-live-msg') || {}).style && document.getElementById('rpi-live-msg').style.display === 'flex';
+  if (msgUp) { retryRpiLive(); return; }
+  captureRpiFrame();
+}
+
+// Keep the live view in step with the rest of the page.
+(function() {
+  const origClear = clearImage;
+  clearImage = function() { origClear.apply(this, arguments); _rpiSync(); };
+  const origSwitch = switchTab;
+  switchTab = function(name) { _curTab = name; const r = origSwitch.apply(this, arguments); _rpiSync(); return r; };
+  document.addEventListener('visibilitychange', _rpiSync);
+  window.addEventListener('pagehide', () => { if (_rpiRunning) _stopRpiStream(); });
+})();
+
+function _rpiInit() { _syncCaptureSourceUI(); if (_captureSource === 'rpi') checkRpiCamera(); _rpiSync(); }
+document.addEventListener('DOMContentLoaded', _rpiInit);
+if (document.readyState !== 'loading') _rpiInit();
 
 // ── Camera Modal ──────────────────────────────────────────────────────
 let _cameraStream = null;
@@ -3199,6 +3275,7 @@ let _capturedBlob = null;
 let _hasMultipleCameras = false;
 
 async function startCameraCapture() {
+  if (_captureSource === 'rpi') { rpiCaptureButton(); return; }   // inline Pi camera: no popup
   const modal = document.getElementById('camera-modal');
   modal.classList.add('open');
   _capturedBlob = null;
@@ -3213,7 +3290,6 @@ async function initCamera() {
   const crosshair= document.getElementById('camera-crosshair');
   const liveTag  = document.getElementById('camera-live-tag');
   _stopStream();
-  if (_captureSource === 'rpi') { return initRpiCamera(); }
   errDiv.style.display = 'none';
   video.style.display  = 'block';
   scanLine.style.display = '';
@@ -3312,7 +3388,6 @@ function _showCameraLive() {
 }
 
 function captureWithDelay(seconds) {
-  if (_captureSource === 'rpi') { capturePhoto(); return; }   // fixed microscope camera: no shake, no countdown
   seconds = seconds || 2;
   const btn = document.getElementById('cam-capture-btn');
   if (btn.disabled) return; // already counting down
@@ -3341,7 +3416,6 @@ function capturePhoto() {
   const useBtn     = document.getElementById('cam-use-btn');
   const retakeBtn  = document.getElementById('cam-retake-btn');
   const liveTag    = document.getElementById('camera-live-tag');
-  if (_captureSource === 'rpi') { captureRpiPhoto(); return; }
   if (!_cameraStream || !video.videoWidth) return;
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -3360,20 +3434,18 @@ function retakePhoto() { _capturedBlob = null; _showCameraLive(); }
 
 function useCapturedPhoto() {
   if (!_capturedBlob) { showErrorModal('No Photo Captured', 'Please capture a photo first before using it.'); return; }
-  const file = new File([_capturedBlob], (_captureSource === 'rpi' ? 'rpi_microscope_capture_' : 'microscope_capture_') + Date.now() + '.jpg', { type: 'image/jpeg' });
+  const file = new File([_capturedBlob], 'microscope_capture_' + Date.now() + '.jpg', { type: 'image/jpeg' });
   closeCameraModal();
   showImagePreview(file);
 }
 
 async function switchCamera() {
-  if (_captureSource === 'rpi') return;
   _cameraFacing = _cameraFacing === 'environment' ? 'user' : 'environment';
   _showCameraLive();
   await initCamera();
 }
 
 function _stopStream() {
-  _stopRpiStream();
   if (_cameraStream) { _cameraStream.getTracks().forEach(t => t.stop()); _cameraStream = null; }
 }
 
