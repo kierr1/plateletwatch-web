@@ -1511,6 +1511,7 @@ body{background-image:none;}
               <thead>
                 <tr style="border-bottom:1px solid var(--warm-gray);">
                   <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10px;">Field</th>
+                  <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10px;">Capture</th>
                   <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10px;">PLT Detected</th>
                   <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10px;">RBC</th>
                   <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10px;">WBC</th>
@@ -1535,7 +1536,7 @@ body{background-image:none;}
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7l3.5 4L12 3" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Finalize (Avg × 20,000)
             </button>
-            <span id="field-session-hint" style="font-size:11px;color:var(--text-muted);font-style:italic;">Scan a field, then click "Add as Field". Repeat for up to 10 fields.</span>
+            <span id="field-session-hint" style="font-size:11px;color:var(--text-muted);font-style:italic;">Capture a field and press Count Platelets — it is recorded automatically. Repeat for up to 10 fields.</span>
           </div>
         </div>
 
@@ -3082,6 +3083,7 @@ function setCaptureSource(src) {
   try { localStorage.setItem('pw_capture_source', _captureSource); } catch (_) {}
   _syncCaptureSourceUI();
   if (_captureSource === 'rpi') checkRpiCamera();
+  _autoFieldSessionForSource();
   _rpiSync();
 }
 
@@ -3102,7 +3104,12 @@ function _updateCaptureBtnLabel() {
   const label = document.getElementById('capture-btn-label');
   if (!label) return;
   if (_captureSource !== 'rpi') label.textContent = 'Capture from phone camera';
-  else label.textContent = currentImageFile ? 'Retake from Pi camera' : 'Capture from Pi camera';
+  else if (currentImageFile) {
+    let inSession = false;
+    try { inSession = _fieldSessionActive && _fieldData.length < 10; } catch (_) {}
+    label.textContent = inSession ? 'Capture next field' : 'Retake from Pi camera';
+  }
+  else label.textContent = 'Capture from Pi camera';
 }
 
 async function checkRpiCamera() {
@@ -3892,9 +3899,9 @@ async function _runPlateletCount() {
 
     displayAnalysisResult(platelets, rbc, wbc, estPerUl, severity, '🔬 YOLOv8: ' + note, zoomLabel);
 
-    // If a 10-field session is active, show the "Add as Field" button
+    // If a 10-field session is active, record this field automatically (no "Add as Field" click)
     if (_fieldSessionActive) {
-      updateFieldSessionUI();
+      await autoRecordCurrentField(detections);
     }
   } catch (err) {
     clearInterval(stepTimer);
@@ -3921,7 +3928,21 @@ async function _runPlateletCount() {
 let _fieldSessionActive = false;
 let _fieldData = []; // [{platelets, rbc, wbc}]
 
+let _fieldSessionAuto = false; // true when the session was switched on automatically by choosing the Pi camera
+
+// Choosing the Raspberry Pi camera switches the 10-field session on by itself;
+// going back to the phone camera switches it off again (unless fields were already recorded).
+function _autoFieldSessionForSource() {
+  if (_captureSource === 'rpi') {
+    if (!_fieldSessionActive) { toggleFieldSession(); _fieldSessionAuto = true; }
+  } else if (_fieldSessionAuto && _fieldSessionActive && _fieldData.length === 0) {
+    resetFieldSession();
+  }
+  _updateCaptureBtnLabel();
+}
+
 function toggleFieldSession() {
+  _fieldSessionAuto = false; // a manual click takes over from the automatic toggle
   _fieldSessionActive = !_fieldSessionActive;
   const panel = document.getElementById('field-session-panel');
   const btn   = document.getElementById('btn-toggle-session');
@@ -3941,6 +3962,7 @@ function toggleFieldSession() {
 
 function resetFieldSession() {
   _fieldSessionActive = false;
+  _fieldSessionAuto = false;
   _fieldData = [];
   const panel = document.getElementById('field-session-panel');
   const btn   = document.getElementById('btn-toggle-session');
@@ -3949,6 +3971,74 @@ function resetFieldSession() {
   btn.style.borderColor = '';
   btn.style.color = '';
   btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 7h5M7 4.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> 10-Field Session`;
+}
+
+// Build a small annotated copy of the analysed image (platelet boxes drawn on it) for the field log.
+function _buildFieldThumb(detections) {
+  return new Promise(resolve => {
+    const src = (document.getElementById('preview-img') || {}).src;
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const W = Math.min(640, img.naturalWidth), k = W / img.naturalWidth, H = Math.round(img.naturalHeight * k);
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, W, H);
+        const colors = { Platelet: '#22D3EE', RBC: '#f87171', WBC: '#fbbf24' };
+        let n = 0;
+        (detections || []).forEach(d => {
+          if (!d || !Array.isArray(d.bbox)) return;
+          const conf = (typeof d.confidence === 'number') ? d.confidence : (typeof d.score === 'number') ? d.score : null;
+          if (conf !== null && conf < _bboxThreshold) return;
+          const [x1, y1, x2, y2] = d.bbox;
+          ctx.strokeStyle = colors[d.class_name] || '#fff';
+          ctx.lineWidth = d.class_name === 'Platelet' ? 2 : 1;
+          ctx.strokeRect(x1 * k, y1 * k, (x2 - x1) * k, (y2 - y1) * k);
+          if (d.class_name === 'Platelet') {
+            n++;
+            ctx.font = 'bold 11px Inter, sans-serif';
+            const label = 'P' + n, tw = ctx.measureText(label).width + 6;
+            ctx.fillStyle = colors.Platelet; ctx.fillRect(x1 * k, y1 * k - 15, tw, 15);
+            ctx.fillStyle = '#0a0d14'; ctx.fillText(label, x1 * k + 3, y1 * k - 4);
+          }
+        });
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      } catch (e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+// While a 10-field session is on, every successful count is recorded as the next field automatically.
+// Re-counting the same capture replaces its entry instead of adding a duplicate.
+async function autoRecordCurrentField(detections) {
+  if (!_fieldSessionActive || !currentAnalysisResult) return;
+  const fileRef = currentImageFile;
+  const existing = _fieldData.findIndex(f => f.fileRef && f.fileRef === fileRef);
+  if (existing === -1 && _fieldData.length >= 10) {
+    updateFieldSessionUI();
+    document.getElementById('field-session-hint').textContent = 'Session full (10 fields). Click "Finalize" or remove a field.';
+    return;
+  }
+  const { platelets, rbc, wbc } = currentAnalysisResult;
+  const thumb = await _buildFieldThumb(detections);
+  if (!_fieldSessionActive) return;
+  const entry = { platelets, rbc, wbc, thumb, fileRef, source: _captureSource === 'rpi' ? 'Pi camera' : 'Upload' };
+  if (existing !== -1) _fieldData[existing] = entry; else _fieldData.push(entry);
+  renderFieldLog();
+  updateFieldSessionUI();
+  const n = _fieldData.length;
+  document.getElementById('field-session-hint').textContent = n >= 10
+    ? '10 fields reached! Click "Finalize" to calculate the final platelet count.'
+    : 'Field ' + (existing !== -1 ? existing + 1 : n) + ' recorded automatically. ' + (n < 3 ? 'Add at least 3 fields (ideally 10).' : 'Capture the next field, or finalize.');
+  _updateCaptureBtnLabel();
+}
+
+function openFieldThumb(i) {
+  const f = _fieldData[i];
+  if (f && f.thumb) openLightbox(f.thumb, 'Field ' + (i + 1) + ' — ' + f.platelets + ' platelets (' + f.source + ')');
 }
 
 function addCurrentImageAsField() {
@@ -3962,7 +4052,7 @@ function addCurrentImageAsField() {
     return;
   }
   const { platelets, rbc, wbc } = currentAnalysisResult;
-  _fieldData.push({ platelets, rbc, wbc });
+  _fieldData.push({ platelets, rbc, wbc, thumb: null, fileRef: currentImageFile, source: 'Manual' });
   renderFieldLog();
   updateFieldSessionUI();
   // Auto-finalize after 10 fields
@@ -3981,12 +4071,15 @@ function renderFieldLog() {
   const tbody = document.getElementById('field-log-body');
   if (!tbody) return;
   if (_fieldData.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:14px 0;font-size:12px;font-style:italic;">No fields added yet. Scan an image, count, then click "Add as Field".</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:14px 0;font-size:12px;font-style:italic;">No fields recorded yet. Capture a field and press Count Platelets — it is added here automatically.</td></tr>`;
     return;
   }
   tbody.innerHTML = _fieldData.map((f, i) => `
     <tr style="border-bottom:1px solid var(--off-white);">
       <td style="padding:7px 8px;font-weight:600;color:var(--teal);">Field ${i + 1}</td>
+      <td style="text-align:center;padding:5px 8px;">${f.thumb
+        ? `<img src="${f.thumb}" alt="Field ${i + 1} capture" title="Click to enlarge" onclick="openFieldThumb(${i})" style="width:96px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--warm-gray);cursor:zoom-in;background:#0a0d14;display:block;margin:0 auto;">`
+        : '<span style="color:var(--text-muted);">—</span>'}</td>
       <td style="text-align:center;padding:7px 8px;font-family:var(--font-display);font-size:15px;color:var(--teal);">${f.platelets}</td>
       <td style="text-align:center;padding:7px 8px;color:#f87171;">${f.rbc.toLocaleString()}</td>
       <td style="text-align:center;padding:7px 8px;color:#fbbf24;">${f.wbc}</td>
@@ -4019,7 +4112,7 @@ function updateFieldSessionUI() {
   }
 
   // Add as Field button — only show when there's a fresh single analysis and session is active
-  document.getElementById('btn-add-field').style.display = (_fieldSessionActive && currentAnalysisResult && n < 10) ? '' : 'none';
+  document.getElementById('btn-add-field').style.display = 'none'; // fields are recorded automatically
 
   // Finalize button — allow at 3+ fields
   document.getElementById('btn-finalize-session').style.display = (n >= 3) ? '' : 'none';
@@ -4031,6 +4124,11 @@ function updateFieldSessionUI() {
     document.getElementById('field-session-hint').textContent = `${n} field${n>1?'s':''} added. Add more or finalize now.`;
   }
 }
+
+// Page load with Pi camera already selected → session starts ON (runs after the session state above exists)
+function _autoSessionInit() { try { _autoFieldSessionForSource(); } catch (_) {} }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _autoSessionInit);
+else _autoSessionInit();
 
 function finalizeFieldSession() {
   if (_fieldData.length < 1) return;
