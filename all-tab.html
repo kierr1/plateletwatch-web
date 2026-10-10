@@ -2748,7 +2748,7 @@ function openHistoryDetail(i) {
   document.getElementById('hd-title').textContent = r.patient || 'No patient name';
   document.getElementById('hd-sub').textContent = formatHistoryDate(r.date) + ' · ' + r.time;
   const img = r.image_url
-    ? `<div class="hd-sec">Microscope image</div><img src="${r.image_url}" alt="Microscope image" onclick="openLightbox('${r.image_url}', '${_hEsc(formatHistoryDate(r.date))} · ${r.time}')" style="width:100%;max-height:260px;object-fit:contain;background:#0a0d14;border-radius:var(--radius-sm);cursor:zoom-in;display:block;" onerror="this.style.display='none'">`
+    ? `<div class="hd-sec">Microscope image</div><img src="${escapeHistoryHtml(r.image_url)}" alt="Microscope image" onclick="openLightbox('${r.image_url}', '${_hEsc(formatHistoryDate(r.date))} · ${r.time}')" style="width:100%;max-height:260px;object-fit:contain;background:#0a0d14;border-radius:var(--radius-sm);cursor:zoom-in;display:block;" onerror="this.style.display='none'">`
     : '';
   document.getElementById('hd-body').innerHTML = `
     <div class="hd-sec">Result</div>
@@ -2773,6 +2773,10 @@ function closeHistoryDetail() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHistoryDetail(); });
 
+function escapeHistoryHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 function renderHistory() {
   try { populateExportPatients(); } catch (e) { /* export state not initialised yet on first paint */ }
   const tbody = document.getElementById("history-body");
@@ -2785,7 +2789,7 @@ function renderHistory() {
     const thumbCell = r.image_url
       ? `<td style="text-align:center;">
            <img src="${r.image_url}" alt="Microscope image"
-             onclick="event.stopPropagation();openLightbox('${r.image_url}', '${formatHistoryDate(r.date)} · ${r.time} · ${r.count} /µL')"
+             onclick="event.stopPropagation();openHistoryDetail(${i})"
              style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1.5px solid var(--warm-gray);cursor:zoom-in;transition:transform .15s,border-color .15s;"
              onmouseover="this.style.transform='scale(1.08)';this.style.borderColor='var(--crimson)'"
              onmouseout="this.style.transform='scale(1)';this.style.borderColor='var(--warm-gray)'"
@@ -2795,11 +2799,11 @@ function renderHistory() {
     const metaCell = `<td><div class="hist-meta">${_histMetaHtml(r)}</div></td>`;
     return `
     <tr class="hist-row" tabindex="0" onclick="openHistoryDetail(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openHistoryDetail(${i})}" title="Click to view full record">
-      <td>${formatHistoryDate(r.date)}&nbsp;&nbsp;${r.time}</td>
+      <td>${formatHistoryDate(r.date)}&nbsp;&nbsp;${escapeHistoryHtml(r.time)}</td>
       ${thumbCell}
       ${metaCell}
-      <td style="text-align:center;">${r.count}</td>
-      <td style="text-align:center;"><span style="${getStatusStyle(r.level)}">${r.status}</span></td>
+      <td style="text-align:center;">${escapeHistoryHtml(r.count)}</td>
+      <td style="text-align:center;"><span style="${getStatusStyle(r.level)}">${escapeHistoryHtml(r.status)}</span></td>
       <td style="text-align:center;white-space:nowrap;">
         <button onclick="event.stopPropagation();openHistoryDetail(${i})" aria-label="View record"
           style="background:none;border:1px solid var(--warm-gray);border-radius:var(--radius-sm);height:34px;padding:0 12px;margin-right:6px;font-size:12px;font-weight:600;font-family:var(--font-ui);cursor:pointer;color:var(--text-mid);">View</button>
@@ -3065,6 +3069,14 @@ function clearImage() {
 //           (/api/camera/stream). "Capture" grabs a full-resolution frame (/api/camera/snapshot),
 //           shows it in the normal preview and it is ready for "Count Platelets" straight away.
 const CAMERA_API = '/api/camera';
+async function authenticatedFetch(url, options = {}) {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) throw new Error('Please sign in first.');
+  return fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + session.access_token }
+  });
+}
 let _captureSource = 'phone';
 try { if (localStorage.getItem('pw_capture_source') === 'rpi') _captureSource = 'rpi'; } catch (_) {}
 let _rpiRunning = false;
@@ -3108,7 +3120,7 @@ async function checkRpiCamera() {
   if (!st || !tx) return null;
   st.classList.remove('ok', 'bad'); tx.textContent = 'Checking camera…';
   try {
-    const r = await fetch(CAMERA_API + '/status', { cache: 'no-store' });
+    const r = await authenticatedFetch(CAMERA_API + '/status', { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (_captureSource !== 'rpi') return d;
@@ -3194,7 +3206,7 @@ async function _startRpiStream() {
     _rpiPollTimer = setInterval(async () => {
       if (busy) return; busy = true;
       try {
-        const r = await fetch(CAMERA_API + '/snapshot?t=' + Date.now(), { cache: 'no-store' });
+        const r = await authenticatedFetch(CAMERA_API + '/snapshot?t=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const url = URL.createObjectURL(await r.blob());
         if (token !== _rpiToken) { URL.revokeObjectURL(url); return; }
@@ -3210,7 +3222,17 @@ async function _startRpiStream() {
   img.onload  = () => { if (token === _rpiToken) { _rpiTagLive(true); _rpiMsg(null); } };
   img.onerror = () => { if (token === _rpiToken && !_rpiPollTimer) startPolling(); };
   img.style.display = 'block';
-  img.src = CAMERA_API + '/stream?t=' + Date.now();
+  try {
+    const ticketResponse = await authenticatedFetch(CAMERA_API + '/stream-ticket', { method: 'POST' });
+    if (!ticketResponse.ok) throw new Error('Camera authorization failed.');
+    const { ticket } = await ticketResponse.json();
+    if (token !== _rpiToken) return;
+    img.src = CAMERA_API + '/stream?ticket=' + encodeURIComponent(ticket);
+  } catch (err) {
+    _rpiMsg('Camera Authorization Failed', err.message);
+    _rpiRunning = false;
+    return;
+  }
   _rpiFallbackTimer = setTimeout(() => {              // no first frame after 5s → stream is probably being buffered
     if (token === _rpiToken && !img.naturalWidth) startPolling();
   }, 5000);
@@ -3832,7 +3854,7 @@ async function _runPlateletCount() {
 
     // Read selected zoom from radio buttons
     const selectedZoom = (document.querySelector('input[name="zoom-select"]:checked') || {}).value || '40x';
-    const response = await fetch('/api/analyze-image', {
+    const response = await authenticatedFetch('/api/analyze-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: base64Data, mediaType, zoom: selectedZoom })
