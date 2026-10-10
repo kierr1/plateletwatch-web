@@ -2789,7 +2789,7 @@ function renderHistory() {
              style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1.5px solid var(--warm-gray);cursor:zoom-in;transition:transform .15s,border-color .15s;"
              onmouseover="this.style.transform='scale(1.08)';this.style.borderColor='var(--crimson)'"
              onmouseout="this.style.transform='scale(1)';this.style.borderColor='var(--warm-gray)'"
-             onerror="this.parentElement.innerHTML='<span style=\'font-size:11px;color:var(--text-muted)\'>No image</span>'">
+             onerror="this.replaceWith(document.createTextNode('No image'))">
          </td>`
       : `<td style="text-align:center;"><span style="font-size:11px;color:var(--mid-gray);">—</span></td>`;
     const metaCell = `<td><div class="hist-meta">${_histMetaHtml(r)}</div></td>`;
@@ -2836,6 +2836,9 @@ async function deleteHistoryRow(i) {
 
   if (row.id) {
     const { error } = await _supabase.from('platelet_analyses').delete().eq('id', row.id);
+    if (!error && row.image_path) {
+      _supabase.storage.from(IMG_BUCKET).remove([row.image_path]).catch(e => console.warn('Could not delete stored image', e));
+    }
     if (error) {
       console.error('Delete error:', error);
       showErrorModal('Delete Failed', 'Could not delete this record from the server: ' + error.message);
@@ -4092,20 +4095,24 @@ async function saveAnalysisToSupabase() {
   const btn = document.getElementById('btn-save-analysis');
   btn.disabled = true;
   btn.textContent = 'Saving…';
-  let imageUrl = null;
+  let imageUrl = null;      // signed (temporary) URL, used for display this session
+  let imagePath = null;     // storage path, this is what gets saved in the database
   if (currentImageFile) {
-    const fileName = session.user.id + '/' + Date.now() + '_' + currentImageFile.name;
-    const { data: uploadData, error: uploadErr } = await _supabase.storage.from('microscope-images').upload(fileName, currentImageFile, { upsert: false });
+    const safeName = (currentImageFile.name || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = session.user.id + '/' + Date.now() + '_' + safeName;
+    const { data: uploadData, error: uploadErr } = await _supabase.storage.from(IMG_BUCKET).upload(fileName, currentImageFile, { upsert: false, contentType: currentImageFile.type || 'image/jpeg' });
+    if (uploadErr) console.error('Image upload error:', uploadErr);
     if (!uploadErr && uploadData) {
-      const { data: urlData } = _supabase.storage.from('microscope-images').getPublicUrl(uploadData.path);
-      imageUrl = urlData?.publicUrl || null;
+      imagePath = uploadData.path;
+      const signed = await signImagePaths([imagePath]);
+      imageUrl = signed[imagePath] || null;
     }
   }
   const { platelets, rbc, wbc, estPerUl, severity } = currentAnalysisResult;
   const extras = getClinicalExtras();
   const baseRow = {
     user_id: session.user.id,
-    image_url: imageUrl,
+    image_url: imagePath,
     platelet_count: platelets,
     rbc_count: rbc,
     wbc_count: wbc,
@@ -4138,7 +4145,7 @@ async function saveAnalysisToSupabase() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl, detections: detRow.detections });
+    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, image_path: imagePath || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl, detections: detRow.detections });
     historyRows = [...ALL_HISTORY_ROWS];
     renderHistory();
     if (typeof Chart !== 'undefined') updatePlateletChart();
@@ -4670,6 +4677,29 @@ function _roundRect(ctx, x, y, w, h, r) {
   });
 })();
 
+// ── Private-bucket image helpers ──────────────────────────────────────
+// The 'microscope-images' bucket is PRIVATE, so images can't be loaded from a plain
+// public URL. We store only the file path in the DB (older rows hold a full public URL,
+// which is converted back to a path here) and ask Supabase for a temporary signed URL.
+const IMG_BUCKET = 'microscope-images';
+const IMG_URL_TTL = 60 * 60 * 6; // signed links last 6 hours
+
+function imgPathFromStored(v) {
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) return v;                      // already a bare path
+  const m = new RegExp('/storage/v1/object/(?:public|sign|authenticated)/' + IMG_BUCKET + '/([^?]+)').exec(v);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+async function signImagePaths(paths) {
+  const out = {};
+  const uniq = [...new Set(paths.filter(Boolean))];
+  if (!uniq.length) return out;
+  const { data, error } = await _supabase.storage.from(IMG_BUCKET).createSignedUrls(uniq, IMG_URL_TTL);
+  if (error) { console.error('Signed URL error:', error); return out; }
+  (data || []).forEach(d => { if (d && d.signedUrl && !d.error) out[d.path] = d.signedUrl; });
+  return out;
+}
+
 // Load analysis history from Supabase
 async function loadAnalysisHistory() {
   const { data: { session } } = await _supabase.auth.getSession();
@@ -4680,11 +4710,14 @@ async function loadAnalysisHistory() {
     .order('created_at', { ascending: false });
   ALL_HISTORY_ROWS.length = 0;
   if (!error && data && data.length > 0) {
+    const signedMap = await signImagePaths(data.map(a => imgPathFromStored(a.image_url)));
     data.forEach(a => {
+      a.image_path = imgPathFromStored(a.image_url);
+      a.image_url  = a.image_path ? (signedMap[a.image_path] || null) : null;
       const dt = new Date(a.created_at);
       const dateStr = dt.toISOString().split('T')[0];
       const timeStr = dt.toTimeString().slice(0, 5);
-      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul, detections: a.detections || null });
+      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, image_path: a.image_path || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul, detections: a.detections || null });
     });
   }
   historyRows = [...ALL_HISTORY_ROWS];
