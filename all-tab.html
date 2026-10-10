@@ -2751,6 +2751,15 @@ function openHistoryDetail(i) {
   const img = r.image_url
     ? `<div class="hd-sec">Microscope image</div><img src="${r.image_url}" alt="Microscope image" onclick="openLightbox('${r.image_url}', '${_hEsc(formatHistoryDate(r.date))} · ${r.time}')" style="width:100%;max-height:260px;object-fit:contain;background:#0a0d14;border-radius:var(--radius-sm);cursor:zoom-in;display:block;" onerror="this.style.display='none'">`
     : '';
+  let gallery = '';
+  if (Array.isArray(r.fields) && r.fields.length) {
+    const cap = i => `Field ${i + 1} — ${r.fields[i].platelets} platelets`;
+    gallery = `<div class="hd-sec">10-Field session images (${r.fields.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;">` +
+      r.fields.map((f, i) => f.url
+        ? `<div style="text-align:center;"><img src="${f.url}" alt="Field ${i + 1}" onclick="openLightbox('${f.url}', '${cap(i)}')" style="width:100%;aspect-ratio:4/3;object-fit:cover;background:#0a0d14;border-radius:6px;cursor:zoom-in;display:block;" onerror="this.style.display='none'"><div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">Field ${i + 1} · <b style="color:var(--teal);">${f.platelets}</b> PLT</div></div>`
+        : `<div style="text-align:center;font-size:10.5px;color:var(--mid-gray);padding:20px 0;">Field ${i + 1}<br>image not saved</div>`).join('') + `</div>`;
+  }
   document.getElementById('hd-body').innerHTML = `
     <div class="hd-sec">Result</div>
     <div style="margin-bottom:10px;"><span style="${getStatusStyle(r.level)}">${_hEsc(r.status)}</span></div>
@@ -2764,7 +2773,7 @@ function openHistoryDetail(i) {
     <div class="hd-grid3">${test('NS1 (antigen)', r.ns1)}${test('Dengue Blot IgM', r.igm)}${test('Dengue Blot IgG', r.igg)}</div>
     <div class="hd-sec">Doctor / Med Tech note</div>
     ${r.note ? `<div class="hd-note">${_hEsc(r.note)}</div>` : `<div style="font-size:13px;color:var(--mid-gray);">No note recorded.</div>`}
-    ${img}`;
+    ${gallery || img}`;
   document.getElementById('hist-detail-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -4025,7 +4034,8 @@ async function autoRecordCurrentField(detections) {
   const { platelets, rbc, wbc } = currentAnalysisResult;
   const thumb = await _buildFieldThumb(detections);
   if (!_fieldSessionActive) return;
-  const entry = { platelets, rbc, wbc, thumb, fileRef, source: _captureSource === 'rpi' ? 'Pi camera' : 'Upload' };
+  const entry = { platelets, rbc, wbc, thumb, fileRef, source: _captureSource === 'rpi' ? 'Pi camera' : 'Upload',
+    detections: (detections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n)), class_name: d.class_name })) };
   if (existing !== -1) _fieldData[existing] = entry; else _fieldData.push(entry);
   renderFieldLog();
   updateFieldSessionUI();
@@ -4149,6 +4159,8 @@ function finalizeFieldSession() {
   else                          severity = 'CRITICAL';
   const note = `10-Field Method — ${n} fields scanned. Avg PLT/field: ${avgPlt.toFixed(1)}. Formula: ${avgPlt.toFixed(1)} × 20,000 = ${estPerUl.toLocaleString()} /µL`;
   displayAnalysisResult(Math.round(avgPlt), avgRbc, avgWbc, estPerUl, severity, '🔬 ' + note, '10-Field Average');
+  // Remember every field (counts + captured images) so "Save" stores the whole session, not just the last image.
+  if (currentAnalysisResult) currentAnalysisResult.fieldSession = _fieldData.map(f => ({ ...f }));
   // Scroll to result
   document.getElementById('analysis-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -4186,8 +4198,42 @@ function resetClinicalExtras() {
   toggleDoctorSuggestions(on, true);
 })();
 
+// Pi camera frames are full-resolution and skip the crop step (which is what shrinks normal uploads), so they can
+// be several MB and get rejected by the storage bucket. Downscale to a sane size before uploading.
+let _imgUploadErrors = [];
+let _lastUploadScale = 1; // how much the last uploaded image was shrunk (detection boxes are scaled to match)
+async function _shrinkForUpload(blob, maxSide, quality) {
+  _lastUploadScale = 1;
+  try {
+    if (!blob || blob.size < 1.5 * 1024 * 1024) { // small enough already, just make sure it has a type
+      return blob && blob.type ? blob : new Blob([blob], { type: 'image/jpeg' });
+    }
+    const url = URL.createObjectURL(blob);
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    const out = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+    if (out) _lastUploadScale = k;
+    return out || blob;
+  } catch (_) { return blob; }
+}
+// Uploads one image for the signed-in user. Returns the storage path, or null (and records the real reason) on failure.
+async function _uploadMicroscopeImage(session, blob, baseName, tag) {
+  if (!blob) return null;
+  const body = await _shrinkForUpload(blob, 2000, 0.9);
+  const safe = (baseName || 'image.jpg').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_') + '.jpg';
+  const path = session.user.id + '/' + Date.now() + '_' + (tag ? tag + '_' : '') + safe;
+  const { data, error } = await _supabase.storage.from(IMG_BUCKET).upload(path, body, { upsert: false, contentType: 'image/jpeg' });
+  if (error) { console.error('Image upload error:', error); _imgUploadErrors.push((tag ? tag + ': ' : '') + (error.message || 'upload failed')); return null; }
+  return data.path;
+}
+
 async function saveAnalysisToSupabase() {
   if (!currentAnalysisResult) return;
+  _imgUploadErrors = [];
   const { data: { session } } = await _supabase.auth.getSession();
   if (!session) { showErrorModal('Not Signed In', 'Please sign in to save your analysis.'); return; }
   const btn = document.getElementById('btn-save-analysis');
@@ -4195,13 +4241,32 @@ async function saveAnalysisToSupabase() {
   btn.textContent = 'Saving…';
   let imageUrl = null;      // signed (temporary) URL, used for display this session
   let imagePath = null;     // storage path, this is what gets saved in the database
-  if (currentImageFile) {
-    const safeName = (currentImageFile.name || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileName = session.user.id + '/' + Date.now() + '_' + safeName;
-    const { data: uploadData, error: uploadErr } = await _supabase.storage.from(IMG_BUCKET).upload(fileName, currentImageFile, { upsert: false, contentType: currentImageFile.type || 'image/jpeg' });
-    if (uploadErr) console.error('Image upload error:', uploadErr);
-    if (!uploadErr && uploadData) {
-      imagePath = uploadData.path;
+  const sessionFields = currentAnalysisResult.fieldSession || null;
+  let singleScale = 1;
+  let fieldImages = null;   // [{path, url, platelets, rbc, wbc, detections}] for a 10-field session
+  if (sessionFields && sessionFields.length) {
+    fieldImages = [];
+    const stamp = Date.now();
+    for (let i = 0; i < sessionFields.length; i++) {
+      btn.textContent = 'Saving image ' + (i + 1) + '/' + sessionFields.length + '…';
+      const f = sessionFields[i];
+      let blob = f.fileRef || null;
+      if (!blob && f.thumb) { try { blob = await (await fetch(f.thumb)).blob(); } catch (_) {} }
+      const path = await _uploadMicroscopeImage(session, blob, (blob && blob.name) || 'field.jpg', 'field' + (i + 1));
+      const sc = _lastUploadScale;
+      const dets = (f.detections || []).map(d => sc === 1 ? d : { ...d, bbox: d.bbox.map(n => Math.round(n * sc)) });
+      fieldImages.push({ path, platelets: f.platelets, rbc: f.rbc, wbc: f.wbc, detections: dets });
+    }
+    const signedF = await signImagePaths(fieldImages.map(f => f.path));
+    fieldImages.forEach(f => { f.url = f.path ? (signedF[f.path] || null) : null; });
+    const first = fieldImages.find(f => f.path);
+    if (first) { imagePath = first.path; imageUrl = first.url; }
+    btn.textContent = 'Saving…';
+  } else if (currentImageFile) {
+    const up = await _uploadMicroscopeImage(session, currentImageFile, currentImageFile.name || 'image.jpg', '');
+    singleScale = _lastUploadScale;
+    if (up) {
+      imagePath = up;
       const signed = await signImagePaths([imagePath]);
       imageUrl = signed[imagePath] || null;
     }
@@ -4219,10 +4284,11 @@ async function saveAnalysisToSupabase() {
   };
   const noteRow  = { clinician_note: extras.note || null };
   const extraRow = { patient_name: extras.patient || null, ns1_antigen: extras.ns1 || null, dengue_igm: extras.igm || null, dengue_igg: extras.igg || null };
-  const detCompact = (_lastDetections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n)), class_name: d.class_name }));
-  const detRow = { detections: detCompact.length ? detCompact : null };
+  const detCompact = (_lastDetections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n * singleScale)), class_name: d.class_name }));
+  const detRow = { detections: (detCompact.length && !fieldImages) ? detCompact : null };
   // Insert the full row; if the table lacks a newer column, drop just that column and retry so the count is never lost.
   const payload = { ...baseRow, ...extraRow, ...noteRow, ...detRow };
+  if (fieldImages) payload.field_images = fieldImages.map(f => ({ path: f.path, platelets: f.platelets, rbc: f.rbc, wbc: f.wbc, detections: f.detections }));
   let insertedRow = null, error = null;
   const droppedCols = [];
   for (let n = 0; n < 8; n++) {
@@ -4234,7 +4300,8 @@ async function saveAnalysisToSupabase() {
     if (m && (m[1] in payload) && !(m[1] in baseRow)) { droppedCols.push(m[1]); delete payload[m[1]]; continue; }
     Object.keys(payload).forEach(k => { if (!(k in baseRow)) { droppedCols.push(k); delete payload[k]; } });
   }
-  if (!error && droppedCols.length) showErrorModal('Saved (some fields not stored)', 'Your count was saved, but these columns are missing from the platelet_analyses table, so their values were not stored: ' + droppedCols.join(', ') + '.');
+  if (!error && _imgUploadErrors.length) showErrorModal('Saved, but image not stored', 'Your count was saved, but the image upload failed: ' + [...new Set(_imgUploadErrors)].join('; ') + '. Check the "microscope-images" bucket limits (file size / allowed types) and storage policies in Supabase.');
+  else if (!error && droppedCols.length) showErrorModal('Saved (some fields not stored)', 'Your count was saved, but these columns are missing from the platelet_analyses table, so their values were not stored: ' + droppedCols.join(', ') + '.');
   if (error) {
     console.error('Save error:', error);
     showErrorModal('Save Failed', 'Error saving analysis: ' + error.message);
@@ -4243,7 +4310,7 @@ async function saveAnalysisToSupabase() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, image_path: imagePath || null, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl, detections: detRow.detections });
+    ALL_HISTORY_ROWS.unshift({ id: insertedRow?.id || null, date: dateStr, time: timeStr, count: estPerUl.toLocaleString(), status: severity, level: severity.toLowerCase(), image_url: imageUrl || null, image_path: imagePath || null, fields: fieldImages, patient: extras.patient, ns1: extras.ns1, igm: extras.igm, igg: extras.igg, note: extras.note, plt: platelets, rbc: rbc, wbc: wbc, est: estPerUl, detections: detRow.detections });
     historyRows = [...ALL_HISTORY_ROWS];
     renderHistory();
     if (typeof Chart !== 'undefined') updatePlateletChart();
@@ -4808,14 +4875,15 @@ async function loadAnalysisHistory() {
     .order('created_at', { ascending: false });
   ALL_HISTORY_ROWS.length = 0;
   if (!error && data && data.length > 0) {
-    const signedMap = await signImagePaths(data.map(a => imgPathFromStored(a.image_url)));
+    const _fp = a => Array.isArray(a.field_images) ? a.field_images.map(f => imgPathFromStored(f && f.path)) : [];
+    const signedMap = await signImagePaths(data.flatMap(a => [imgPathFromStored(a.image_url), ..._fp(a)]));
     data.forEach(a => {
       a.image_path = imgPathFromStored(a.image_url);
       a.image_url  = a.image_path ? (signedMap[a.image_path] || null) : null;
       const dt = new Date(a.created_at);
       const dateStr = dt.toISOString().split('T')[0];
       const timeStr = dt.toTimeString().slice(0, 5);
-      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, image_path: a.image_path || null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul, detections: a.detections || null });
+      ALL_HISTORY_ROWS.push({ id: a.id, date: dateStr, time: timeStr, count: (a.est_count_per_ul || 0).toLocaleString(), status: a.severity || 'NORMAL', level: (a.severity || 'normal').toLowerCase(), image_url: a.image_url || null, image_path: a.image_path || null, fields: Array.isArray(a.field_images) ? a.field_images.map(f => ({ ...f, url: signedMap[imgPathFromStored(f && f.path)] || null })) : null, patient: a.patient_name || '', ns1: a.ns1_antigen || '', igm: a.dengue_igm || '', igg: a.dengue_igg || '', note: a.clinician_note || '', plt: a.platelet_count, rbc: a.rbc_count, wbc: a.wbc_count, est: a.est_count_per_ul, detections: a.detections || null });
     });
   }
   historyRows = [...ALL_HISTORY_ROWS];
