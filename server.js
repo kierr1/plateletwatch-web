@@ -286,82 +286,45 @@ app.get('/api/camera/stream', requireCameraTicket, cameraLimiter, async (req, re
 });
 
 app.post('/api/analyze-image', requireAuth, aiLimiter, async (req, res) => {
-  const { image, mediaType, zoom, confidence } = req.body;
-
+  const { image, mediaType, zoom, confidence, platelet_confidence, calib_factor } = req.body || {};
   if (!image || typeof image !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid image data.' });
   }
   if (image.length > 8_000_000) {
     return res.status(413).json({ error: 'Image too large. Please use an image under 6 MB.' });
   }
-
-  // Check inference server is reachable first
   try {
-    const health = await fetch(`${INFERENCE_URL}/health`, { signal: AbortSignal.timeout(3000) });
-    if (!health.ok) throw new Error('Inference server not healthy');
-  } catch {
-    return res.status(503).json({
-      error: 'YOLOv8 inference server is not running. Start it with: python inference_server.py'
-    });
-  }
-
-  try {
-    const response = await fetch(`${INFERENCE_URL}/api/analyze-image`, {
+    const upstream = await fetch(`${INFERENCE_URL}/api/analyze-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Forward the zoom level the user actually selected (10x/40x/100x) —
-      // inference_server.py uses this to pick the correct calibration factor.
-      // Previously this was never forwarded, so it silently defaulted to 40x.
       body: JSON.stringify({
         image,
-        mediaType,
+        mediaType: mediaType || 'image/jpeg',
         zoom: zoom || '40x',
-        confidence: confidence || 0.25,
+        confidence: confidence ?? 0.25,
+        ...(platelet_confidence === undefined ? {} : { platelet_confidence }),
+        ...(calib_factor === undefined ? {} : { calib_factor }),
       }),
-      signal: AbortSignal.timeout(30000), // 30s timeout for large images
+      signal: AbortSignal.timeout(120000),
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: err.detail || 'Inference failed.' });
+    const payload = await upstream.text();
+    let data;
+    try {
+      data = JSON.parse(payload);
+    } catch {
+      console.error('Inference returned non-JSON, HTTP', upstream.status);
+      return res.status(502).json({ error: 'Invalid response from inference server.' });
     }
-
-    const data = await response.json();
-
-    // The smear-gate classifier in inference_server.py can reject an image
-    // before any detection ever runs, returning just:
-    //   { not_blood_sample: true, reason: "..." }
-    // This must be forwarded to the frontend as-is -- it does NOT have
-    // platelets/rbc/wbc/etc fields, so reshaping it below would silently
-    // strip the rejection flag and reason, making every rejected image
-    // look like a normal (empty) result to the browser.
-    if (data.not_blood_sample) {
-      return res.json({
-        not_blood_sample: true,
-        reason: data.reason || 'This image does not appear to be a valid blood smear.',
+    if (!upstream.ok) {
+      console.error('Inference upstream HTTP', upstream.status);
+      return res.status(upstream.status).json({
+        error: data.detail || data.error || `Inference HTTP ${upstream.status}`,
       });
     }
-
-    // Real response shape from inference_server.py:
-    // { platelets, rbc, wbc, est_per_ul, calib_factor, zoom, zoom_note,
-    //   severity, severity_label, severity_color, clinical_note, note,
-    //   detections, total_objects, image_size }
-    // severity is already one of NORMAL/LOW/DANGER/CRITICAL/HIGH/UNKNOWN,
-    // matching what the frontend expects directly — no relabeling needed.
-    res.json({
-      platelets:   data.platelets   || 0,
-      rbc:         data.rbc         || 0,
-      wbc:         data.wbc         || 0,
-      est_per_ul:  data.est_per_ul  || 0,
-      severity:    data.severity    || 'UNKNOWN',
-      detections:  data.detections  || [],
-      note:        data.note || data.clinical_note || '',
-      zoom:        data.zoom || null,
-    });
-
+    return res.json(data);
   } catch (err) {
-    console.error('Analysis error:', err.message);
-    res.status(500).json({ error: 'Image analysis failed. Please try again.' });
+    console.error('Inference proxy failed:', err.message);
+    return res.status(503).json({ error: 'Inference server unreachable or timed out.' });
   }
 });
 
