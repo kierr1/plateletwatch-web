@@ -25,76 +25,16 @@ const DEFAULT_DAILY_LIMIT = 30; // messages/day per user if no row exists yet
 async function checkAndConsumeQuota(authHeader) {
   const token = (authHeader || '').replace(/^Bearer\s+/i, '');
   if (!token) return { ok: false, status: 401, error: 'Not signed in.' };
-
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !user) {
-    // TEMPORARY: log the real reason so we can see it in Render's logs.
-    // Remove this console.error once the issue is fixed.
-    console.error('Auth check failed:', authErr?.message || 'no user returned', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      supabaseUrlSet: !!process.env.SUPABASE_URL,
-      serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    });
-    return { ok: false, status: 401, error: 'Invalid or expired session.' };
+  if (authErr || !user) return { ok: false, status: 401, error: 'Invalid or expired session.' };
+
+  const { data, error } = await supabaseAdmin.rpc('consume_chat_quota', { p_user_id: user.id });
+  if (error) {
+    console.error('Chat quota RPC failed:', error.message);
+    return { ok: false, status: 500, error: 'Chat quota service unavailable.' };
   }
-
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-  let { data: usage, error: fetchErr } = await supabaseAdmin
-    .from('chat_usage')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (fetchErr) return { ok: false, status: 500, error: 'Quota lookup failed.' };
-
-  // No row yet -> create one with defaults
-  if (!usage) {
-    const { data: created, error: insertErr } = await supabaseAdmin
-      .from('chat_usage')
-      .insert({ user_id: user.id, messages_used: 0, daily_limit: DEFAULT_DAILY_LIMIT, last_reset_date: today })
-      .select()
-      .single();
-    if (insertErr) return { ok: false, status: 500, error: 'Could not create quota record.' };
-    usage = created;
-  }
-
-  // Reset counter if it's a new day
-  if (usage.last_reset_date !== today) {
-    usage.messages_used = 0;
-    usage.last_reset_date = today;
-  }
-
-  if (usage.messages_used >= usage.daily_limit) {
-    // Persist the reset even if they're over limit, so tomorrow starts clean
-    await supabaseAdmin.from('chat_usage').update({
-      messages_used: usage.messages_used,
-      last_reset_date: usage.last_reset_date,
-    }).eq('user_id', user.id);
-    return {
-      ok: false,
-      status: 429,
-      error: `You've used all ${usage.daily_limit} chat messages for today. Resets tomorrow.`,
-    };
-  }
-
-  // Consume one message from their quota
-  const { error: updateErr } = await supabaseAdmin
-    .from('chat_usage')
-    .update({
-      messages_used: usage.messages_used + 1,
-      last_reset_date: usage.last_reset_date,
-    })
-    .eq('user_id', user.id);
-
-  if (updateErr) return { ok: false, status: 500, error: 'Could not update quota.' };
-
-  return {
-    ok: true,
-    userId: user.id,
-    remaining: usage.daily_limit - (usage.messages_used + 1),
-  };
+  if (!data?.allowed) return { ok: false, status: 429, error: 'Daily chat message limit reached. Resets tomorrow (UTC).' };
+  return { ok: true, userId: user.id, remaining: data.remaining };
 }
 
 const app  = express();
