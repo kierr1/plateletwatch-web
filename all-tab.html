@@ -527,6 +527,24 @@ body{background-image:radial-gradient(var(--warm-gray) 1px,transparent 1px);back
 .cam-btn-use:hover{background:#0a5d61;}
 @media(max-width:520px){.camera-modal-box{border-radius:var(--radius-md);}.cam-btn-capture{width:54px;height:54px;}.camera-controls{padding:14px 12px;gap:10px;}}
 
+/* ── CAPTURE SOURCE (phone vs Raspberry Pi camera) ─────────────────── */
+.capture-source-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.capture-source-label{font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;}
+.capture-source-seg{display:inline-flex;background:var(--off-white);border:1px solid var(--warm-gray);border-radius:11px;padding:3px;gap:2px;}
+.cs-opt{display:inline-flex;align-items:center;gap:6px;border:none;background:transparent;color:var(--text-mid);font-family:var(--font-ui);font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px;cursor:pointer;transition:background .15s,color .15s;}
+.cs-opt svg{flex-shrink:0;}
+.cs-opt.active{background:var(--teal);color:#fff;}
+.cs-opt:not(.active):hover{background:var(--warm-gray);}
+.capture-source-status{display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);}
+.capture-source-status .dot{width:7px;height:7px;border-radius:50%;background:#9ca3af;flex-shrink:0;}
+.capture-source-status.ok .dot{background:#16a34a;}
+.capture-source-status.bad .dot{background:#dc2626;}
+.camera-viewport img#camera-rpi-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000;}
+body.dark-mode .capture-source-seg{background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.1)!important;}
+body.dark-mode .cs-opt:not(.active){color:#b4bccf!important;}
+body.dark-mode .cs-opt:not(.active):hover{background:rgba(255,255,255,.08)!important;}
+@media(max-width:520px){.capture-source-row{flex-direction:column;align-items:stretch;}.capture-source-seg{display:flex;}.cs-opt{flex:1;justify-content:center;}}
+
 /* ── CROP MODAL ────────────────────────────────────────────────────── */
 .crop-modal-overlay{position:fixed;inset:0;background:rgba(10,6,8,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s ease;}
 .crop-modal-overlay.open{opacity:1;pointer-events:all;}
@@ -1407,6 +1425,20 @@ body{background-image:none;}
           </label>
         </div>
 
+        <div class="capture-source-row" id="capture-source-row">
+          <span class="capture-source-label">Capture source</span>
+          <div class="capture-source-seg" role="radiogroup" aria-label="Capture source">
+            <button type="button" class="cs-opt active" id="cs-opt-phone" role="radio" aria-checked="true" onclick="setCaptureSource('phone')">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="1" width="7" height="12" rx="1.6"/><path d="M6 11h2"/></svg>
+              Phone camera
+            </button>
+            <button type="button" class="cs-opt" id="cs-opt-rpi" role="radio" aria-checked="false" onclick="setCaptureSource('rpi')">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="12" height="8" rx="1.6"/><circle cx="7" cy="7" r="2"/><path d="M4 1.5h1.5"/></svg>
+              Raspberry Pi camera
+            </button>
+          </div>
+          <span class="capture-source-status" id="cs-rpi-status" aria-live="polite"><span class="dot"></span><span id="cs-rpi-status-text"></span></span>
+        </div>
         <div class="upload-controls">
           <button class="btn-outline" onclick="document.getElementById('image-file-input').click()" aria-label="Upload image from local device">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 10V13H12V10M7 2V9M4.5 4.5L7 2L9.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1414,7 +1446,7 @@ body{background-image:none;}
           </button>
           <button class="btn-outline" onclick="startCameraCapture()" aria-label="Capture directly from connected microscope">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 5V4C1.5 3.172 2.172 2.5 3 2.5H4.5L5.5 1H8.5L9.5 2.5H11C11.828 2.5 12.5 3.172 12.5 4V10C12.5 10.828 11.828 11.5 11 11.5H3C2.172 11.5 1.5 10.828 1.5 10V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-            Capture from microscope
+            <span id="capture-btn-label">Capture from microscope</span>
           </button>
           <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleCameraCapture(event)">
           <div class="upload-controls-actions" style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -1786,12 +1818,13 @@ body{background-image:none;}
     <div class="camera-modal-head">
       <div class="camera-modal-title">
         <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="2.5"/><path d="M1.5 5V4C1.5 3.172 2.172 2.5 3 2.5H4.5L5.5 1H8.5L9.5 2.5H11C11.828 2.5 12.5 3.172 12.5 4V10C12.5 10.828 11.828 11.5 11 11.5H3C2.172 11.5 1.5 10.828 1.5 10V7"/></svg>
-        Capture from Microscope
+        <span id="camera-modal-title-text">Capture from Microscope</span>
       </div>
       <button class="camera-modal-close" onclick="closeCameraModal()" aria-label="Close">✕</button>
     </div>
     <div class="camera-viewport">
       <video id="camera-video" autoplay playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
+      <img id="camera-rpi-img" alt="Live view from the Raspberry Pi camera" decoding="async">
       <canvas id="camera-canvas"></canvas>
       <div class="camera-scan-line" id="camera-scan-line"></div>
       <div class="camera-crosshair" id="camera-crosshair">
@@ -3003,6 +3036,162 @@ function clearImage() {
   if (addFieldBtn) addFieldBtn.style.display = 'none';
 }
 
+// ── Capture source: phone camera (browser) vs Raspberry Pi USB camera (server) ──
+// 'phone' → getUserMedia in this browser (original behaviour).
+// 'rpi'   → live MJPEG view from the Pi's USB camera via /api/camera/stream; the capture
+//           button grabs a full-resolution frame from /api/camera/snapshot. Either way the
+//           result becomes a File and goes through the same crop → analyse flow.
+const CAMERA_API = '/api/camera';
+let _captureSource = 'phone';
+try { if (localStorage.getItem('pw_capture_source') === 'rpi') _captureSource = 'rpi'; } catch (_) {}
+let _rpiPollTimer = null;
+let _rpiFallbackTimer = null;
+let _rpiPollUrl = null;
+let _rpiLiveToken = 0;
+
+function setCaptureSource(src) {
+  _captureSource = (src === 'rpi') ? 'rpi' : 'phone';
+  try { localStorage.setItem('pw_capture_source', _captureSource); } catch (_) {}
+  _syncCaptureSourceUI();
+  if (_captureSource === 'rpi') checkRpiCamera();
+}
+
+function _syncCaptureSourceUI() {
+  const rpi = _captureSource === 'rpi';
+  const bPhone = document.getElementById('cs-opt-phone');
+  const bRpi   = document.getElementById('cs-opt-rpi');
+  if (bPhone && bRpi) {
+    bPhone.classList.toggle('active', !rpi); bPhone.setAttribute('aria-checked', String(!rpi));
+    bRpi.classList.toggle('active', rpi);    bRpi.setAttribute('aria-checked', String(rpi));
+  }
+  const label = document.getElementById('capture-btn-label');
+  if (label) label.textContent = rpi ? 'Capture from Pi camera' : 'Capture from phone camera';
+  const title = document.getElementById('camera-modal-title-text');
+  if (title) title.textContent = rpi ? 'Capture from Raspberry Pi Camera' : 'Capture from Microscope';
+  const st = document.getElementById('cs-rpi-status');
+  if (st) st.style.display = rpi ? 'inline-flex' : 'none';
+}
+
+async function checkRpiCamera() {
+  const st = document.getElementById('cs-rpi-status');
+  const tx = document.getElementById('cs-rpi-status-text');
+  if (!st || !tx) return null;
+  st.classList.remove('ok', 'bad'); tx.textContent = 'Checking camera…';
+  try {
+    const r = await fetch(CAMERA_API + '/status', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (_captureSource !== 'rpi') return d;
+    st.classList.add(d.available ? 'ok' : 'bad');
+    tx.textContent = d.available ? 'Pi camera ready' : (d.reason || 'Pi camera not available');
+    return d;
+  } catch (e) {
+    st.classList.add('bad');
+    tx.textContent = 'Can’t reach the Pi camera service';
+    return null;
+  }
+}
+
+function _stopRpiStream() {
+  _rpiLiveToken++;
+  if (_rpiPollTimer) { clearInterval(_rpiPollTimer); _rpiPollTimer = null; }
+  if (_rpiFallbackTimer) { clearTimeout(_rpiFallbackTimer); _rpiFallbackTimer = null; }
+  if (_rpiPollUrl) { URL.revokeObjectURL(_rpiPollUrl); _rpiPollUrl = null; }
+  const img = document.getElementById('camera-rpi-img');
+  if (img) { img.onload = null; img.onerror = null; img.removeAttribute('src'); img.style.display = 'none'; }
+}
+
+async function initRpiCamera() {
+  const video     = document.getElementById('camera-video');
+  const img       = document.getElementById('camera-rpi-img');
+  const errDiv    = document.getElementById('camera-err');
+  const scanLine  = document.getElementById('camera-scan-line');
+  const crosshair = document.getElementById('camera-crosshair');
+  const liveTag   = document.getElementById('camera-live-tag');
+  const lockBtn   = document.getElementById('cam-lock-btn');
+  const flipBtn   = document.getElementById('cam-switch-btn');
+  const token = ++_rpiLiveToken;
+  video.style.display = 'none';
+  if (lockBtn) lockBtn.style.display = 'none';
+  if (flipBtn) flipBtn.style.display = 'none';       // no front/back camera on the Pi
+  errDiv.style.display = 'none';
+  scanLine.style.display = ''; crosshair.style.display = ''; liveTag.style.display = '';
+  liveTag.textContent = '● LIVE · PI'; liveTag.style.color = '#22D3EE';
+
+  const status = await checkRpiCamera();
+  if (token !== _rpiLiveToken) return;               // modal closed / source changed meanwhile
+  if (!status) { _showCameraError('Pi Camera Unreachable', 'The page could not reach the Raspberry Pi camera. Make sure the Pi is on and inference_server.py is running, or switch to Phone camera.'); return; }
+  if (!status.available) { _showCameraError('Pi Camera Not Available', status.reason || 'No USB camera was found on the Raspberry Pi.'); return; }
+
+  const startPolling = () => {
+    if (token !== _rpiLiveToken || _rpiPollTimer) return;
+    // Fallback for proxies that buffer multipart streams: fetch ~4 snapshots per second instead.
+    let busy = false, fails = 0;
+    _rpiPollTimer = setInterval(async () => {
+      if (busy) return; busy = true;
+      try {
+        const r = await fetch(CAMERA_API + '/snapshot?t=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const url = URL.createObjectURL(await r.blob());
+        if (token !== _rpiLiveToken) { URL.revokeObjectURL(url); return; }
+        const old = _rpiPollUrl; _rpiPollUrl = url; img.src = url; img.style.display = 'block';
+        if (old) URL.revokeObjectURL(old);
+        fails = 0;
+      } catch (e) {
+        if (++fails >= 4 && token === _rpiLiveToken) { _stopRpiStream(); _showCameraError('Pi Camera Stopped', 'The Raspberry Pi camera stopped responding. Tap Retry or switch to Phone camera.'); }
+      } finally { busy = false; }
+    }, 250);
+  };
+
+  img.style.display = 'block';
+  img.onerror = () => { if (token === _rpiLiveToken && !_rpiPollTimer) startPolling(); };
+  img.src = CAMERA_API + '/stream?t=' + Date.now();
+  _rpiFallbackTimer = setTimeout(() => {              // no first frame after 5s → stream is probably being buffered
+    if (token === _rpiLiveToken && !img.naturalWidth) startPolling();
+  }, 5000);
+}
+
+async function _grabRpiSnapshot() {
+  const r = await fetch(CAMERA_API + '/snapshot?t=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) {
+    let msg = 'HTTP ' + r.status;
+    try { const j = await r.json(); if (j.detail || j.error) msg = j.detail || j.error; } catch (_) {}
+    throw new Error(msg);
+  }
+  return await r.blob();
+}
+
+async function captureRpiPhoto() {
+  const canvas     = document.getElementById('camera-canvas');
+  const captureBtn = document.getElementById('cam-capture-btn');
+  const useBtn     = document.getElementById('cam-use-btn');
+  const retakeBtn  = document.getElementById('cam-retake-btn');
+  const liveTag    = document.getElementById('camera-live-tag');
+  if (captureBtn.disabled) return;
+  captureBtn.disabled = true;
+  try {
+    const blob = await _grabRpiSnapshot();
+    const bmp = await createImageBitmap(blob);
+    canvas.width = bmp.width; canvas.height = bmp.height;
+    canvas.getContext('2d').drawImage(bmp, 0, 0);
+    if (bmp.close) bmp.close();
+    _capturedBlob = blob;
+    canvas.classList.add('show');
+    captureBtn.style.display = 'none';
+    useBtn.style.display     = 'flex';
+    retakeBtn.style.display  = '';
+    liveTag.textContent      = '● CAPTURED';
+    liveTag.style.color      = '#fbbf24';
+  } catch (e) {
+    showErrorModal('Pi Camera Capture Failed', e.message || 'Could not grab a frame from the Raspberry Pi camera.');
+  } finally {
+    captureBtn.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { _syncCaptureSourceUI(); if (_captureSource === 'rpi') checkRpiCamera(); });
+if (document.readyState !== 'loading') { _syncCaptureSourceUI(); if (_captureSource === 'rpi') checkRpiCamera(); }
+
 // ── Camera Modal ──────────────────────────────────────────────────────
 let _cameraStream = null;
 let _cameraFacing = 'environment';
@@ -3024,6 +3213,7 @@ async function initCamera() {
   const crosshair= document.getElementById('camera-crosshair');
   const liveTag  = document.getElementById('camera-live-tag');
   _stopStream();
+  if (_captureSource === 'rpi') { return initRpiCamera(); }
   errDiv.style.display = 'none';
   video.style.display  = 'block';
   scanLine.style.display = '';
@@ -3122,6 +3312,7 @@ function _showCameraLive() {
 }
 
 function captureWithDelay(seconds) {
+  if (_captureSource === 'rpi') { capturePhoto(); return; }   // fixed microscope camera: no shake, no countdown
   seconds = seconds || 2;
   const btn = document.getElementById('cam-capture-btn');
   if (btn.disabled) return; // already counting down
@@ -3150,6 +3341,7 @@ function capturePhoto() {
   const useBtn     = document.getElementById('cam-use-btn');
   const retakeBtn  = document.getElementById('cam-retake-btn');
   const liveTag    = document.getElementById('camera-live-tag');
+  if (_captureSource === 'rpi') { captureRpiPhoto(); return; }
   if (!_cameraStream || !video.videoWidth) return;
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -3168,18 +3360,20 @@ function retakePhoto() { _capturedBlob = null; _showCameraLive(); }
 
 function useCapturedPhoto() {
   if (!_capturedBlob) { showErrorModal('No Photo Captured', 'Please capture a photo first before using it.'); return; }
-  const file = new File([_capturedBlob], 'microscope_capture_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+  const file = new File([_capturedBlob], (_captureSource === 'rpi' ? 'rpi_microscope_capture_' : 'microscope_capture_') + Date.now() + '.jpg', { type: 'image/jpeg' });
   closeCameraModal();
   showImagePreview(file);
 }
 
 async function switchCamera() {
+  if (_captureSource === 'rpi') return;
   _cameraFacing = _cameraFacing === 'environment' ? 'user' : 'environment';
   _showCameraLive();
   await initCamera();
 }
 
 function _stopStream() {
+  _stopRpiStream();
   if (_cameraStream) { _cameraStream.getTracks().forEach(t => t.stop()); _cameraStream = null; }
 }
 
