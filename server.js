@@ -146,7 +146,7 @@ app.use('/api/', (req, res, next) =>
 async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
-    const match = /^Bearer\\s+(.+)$/i.exec(header);
+    const match = /^Bearer\s+(.+)$/i.exec(header);
     if (!match) return res.status(401).json({ error: 'Sign in required.' });
     const { data, error } = await supabaseAdmin.auth.getUser(match[1]);
     if (error || !data.user) return res.status(401).json({ error: 'Invalid or expired session.' });
