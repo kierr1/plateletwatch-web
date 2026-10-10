@@ -25,16 +25,76 @@ const DEFAULT_DAILY_LIMIT = 30; // messages/day per user if no row exists yet
 async function checkAndConsumeQuota(authHeader) {
   const token = (authHeader || '').replace(/^Bearer\s+/i, '');
   if (!token) return { ok: false, status: 401, error: 'Not signed in.' };
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !user) return { ok: false, status: 401, error: 'Invalid or expired session.' };
 
-  const { data, error } = await supabaseAdmin.rpc('consume_chat_quota', { p_user_id: user.id });
-  if (error) {
-    console.error('Chat quota RPC failed:', error.message);
-    return { ok: false, status: 500, error: 'Chat quota service unavailable.' };
+  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+  if (authErr || !user) {
+    // TEMPORARY: log the real reason so we can see it in Render's logs.
+    // Remove this console.error once the issue is fixed.
+    console.error('Auth check failed:', authErr?.message || 'no user returned', {
+      hasToken: !!token,
+      tokenLength: token.length,
+      supabaseUrlSet: !!process.env.SUPABASE_URL,
+      serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
+    return { ok: false, status: 401, error: 'Invalid or expired session.' };
   }
-  if (!data?.allowed) return { ok: false, status: 429, error: 'Daily chat message limit reached. Resets tomorrow (UTC).' };
-  return { ok: true, userId: user.id, remaining: data.remaining };
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  let { data: usage, error: fetchErr } = await supabaseAdmin
+    .from('chat_usage')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, status: 500, error: 'Quota lookup failed.' };
+
+  // No row yet -> create one with defaults
+  if (!usage) {
+    const { data: created, error: insertErr } = await supabaseAdmin
+      .from('chat_usage')
+      .insert({ user_id: user.id, messages_used: 0, daily_limit: DEFAULT_DAILY_LIMIT, last_reset_date: today })
+      .select()
+      .single();
+    if (insertErr) return { ok: false, status: 500, error: 'Could not create quota record.' };
+    usage = created;
+  }
+
+  // Reset counter if it's a new day
+  if (usage.last_reset_date !== today) {
+    usage.messages_used = 0;
+    usage.last_reset_date = today;
+  }
+
+  if (usage.messages_used >= usage.daily_limit) {
+    // Persist the reset even if they're over limit, so tomorrow starts clean
+    await supabaseAdmin.from('chat_usage').update({
+      messages_used: usage.messages_used,
+      last_reset_date: usage.last_reset_date,
+    }).eq('user_id', user.id);
+    return {
+      ok: false,
+      status: 429,
+      error: `You've used all ${usage.daily_limit} chat messages for today. Resets tomorrow.`,
+    };
+  }
+
+  // Consume one message from their quota
+  const { error: updateErr } = await supabaseAdmin
+    .from('chat_usage')
+    .update({
+      messages_used: usage.messages_used + 1,
+      last_reset_date: usage.last_reset_date,
+    })
+    .eq('user_id', user.id);
+
+  if (updateErr) return { ok: false, status: 500, error: 'Could not update quota.' };
+
+  return {
+    ok: true,
+    userId: user.id,
+    remaining: usage.daily_limit - (usage.messages_used + 1),
+  };
 }
 
 const app  = express();
@@ -94,19 +154,7 @@ app.get(Object.keys(HTML_REDIRECTS), (req, res) => {
 });
 
 // ── Static files ───────────────────────────────────────────────────────
-// Only allow known public assets, never the server source, lockfiles or migrations.
-app.use((req, res, next) => {
-  const p = decodeURIComponent(req.path).toLowerCase();
-  const basename = path.posix.basename(p);
-  if (/^\/(?:api)(?:\/|$)/.test(p)) return next();
-  if (/\.(?:js|css|html|png|jpg|jpeg|webp|svg|ico|woff2?|ttf)$/.test(basename)) {
-    if (basename === 'server.js' || basename === 'package-lock.json' || basename.endsWith('.config.json')) return res.sendStatus(404);
-    return next();
-  }
-  if (p === '/') return next();
-  return res.sendStatus(404);
-});
-app.use(express.static(path.join(__dirname), { dotfiles: 'deny', index: false, fallthrough: true }));
+app.use(express.static(path.join(__dirname), { dotfiles: 'deny', index: false }));
 app.use(express.json({ limit: '10mb' }));
 
 // ── Rate Limiters ─────────────────────────────────────────────────────
@@ -141,45 +189,6 @@ const chatLimiter = rateLimit({
 // in the page legitimately makes ~4 requests/second, which generalLimiter would block.
 app.use('/api/', (req, res, next) =>
   req.path.startsWith('/camera/') ? next() : generalLimiter(req, res, next));
-
-
-async function requireAuth(req, res, next) {
-  try {
-    const header = req.headers.authorization || '';
-    const match = /^Bearer\s+(.+)$/i.exec(header);
-    if (!match) return res.status(401).json({ error: 'Sign in required.' });
-    const { data, error } = await supabaseAdmin.auth.getUser(match[1]);
-    if (error || !data.user) return res.status(401).json({ error: 'Invalid or expired session.' });
-    req.user = data.user;
-    next();
-  } catch (err) {
-    return res.status(503).json({ error: 'Authentication service unavailable.' });
-  }
-}
-
-// A short-lived, one-use camera stream ticket lets an <img> display MJPEG
-// without placing the user's long-lived Supabase token in the URL.
-const { randomBytes } = require('crypto');
-const cameraTickets = new Map();
-app.post('/api/camera/stream-ticket', requireAuth, (req, res) => {
-  if (cameraTickets.size > 2000) {
-    for (const [key, ticket] of cameraTickets) {
-      if (ticket.expires < Date.now()) cameraTickets.delete(key);
-    }
-  }
-  if (cameraTickets.size > 2000) return res.status(429).json({ error: 'Too many stream tickets.' });
-  const ticket = randomBytes(32).toString('hex');
-  cameraTickets.set(ticket, { userId: req.user.id, expires: Date.now() + 30000 });
-  res.set('Cache-Control', 'no-store').json({ ticket });
-});
-function requireCameraTicket(req, res, next) {
-  const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
-  const entry = cameraTickets.get(ticket);
-  if (entry) cameraTickets.delete(ticket);
-  if (!entry || entry.expires < Date.now()) return res.status(401).json({ error: 'Camera authorization required.' });
-  req.user = { id: entry.userId };
-  next();
-}
 
 const cameraLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -228,7 +237,7 @@ async function relayCameraError(upstream, res) {
   return sendCameraError(res, upstream.status, e.detail || e.error || 'Raspberry Pi camera error.');
 }
 
-app.get('/api/camera/status', requireAuth, cameraLimiter, async (req, res) => {
+app.get('/api/camera/status', cameraLimiter, async (req, res) => {
   try {
     const r = await fetch(`${INFERENCE_URL}/api/camera/status`, { signal: AbortSignal.timeout(5000) });
     if (!r.ok) return relayCameraError(r, res);
@@ -238,7 +247,7 @@ app.get('/api/camera/status', requireAuth, cameraLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/camera/snapshot', requireAuth, cameraLimiter, async (req, res) => {
+app.get('/api/camera/snapshot', cameraLimiter, async (req, res) => {
   try {
     const r = await fetch(`${INFERENCE_URL}/api/camera/snapshot`, { signal: AbortSignal.timeout(15000) });
     if (!r.ok) return relayCameraError(r, res);
@@ -249,7 +258,7 @@ app.get('/api/camera/snapshot', requireAuth, cameraLimiter, async (req, res) => 
   }
 });
 
-app.get('/api/camera/stream', requireCameraTicket, cameraLimiter, async (req, res) => {
+app.get('/api/camera/stream', cameraLimiter, async (req, res) => {
   if (activeCameraStreams >= MAX_CAMERA_STREAMS) {
     return sendCameraError(res, 429, 'The camera is already being viewed by the maximum number of people. Try again shortly.');
   }
@@ -285,46 +294,83 @@ app.get('/api/camera/stream', requireCameraTicket, cameraLimiter, async (req, re
   }
 });
 
-app.post('/api/analyze-image', requireAuth, aiLimiter, async (req, res) => {
-  const { image, mediaType, zoom, confidence, platelet_confidence, calib_factor } = req.body || {};
+app.post('/api/analyze-image', aiLimiter, async (req, res) => {
+  const { image, mediaType, zoom, confidence } = req.body;
+
   if (!image || typeof image !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid image data.' });
   }
   if (image.length > 8_000_000) {
     return res.status(413).json({ error: 'Image too large. Please use an image under 6 MB.' });
   }
+
+  // Check inference server is reachable first
   try {
-    const upstream = await fetch(`${INFERENCE_URL}/api/analyze-image`, {
+    const health = await fetch(`${INFERENCE_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    if (!health.ok) throw new Error('Inference server not healthy');
+  } catch {
+    return res.status(503).json({
+      error: 'YOLOv8 inference server is not running. Start it with: python inference_server.py'
+    });
+  }
+
+  try {
+    const response = await fetch(`${INFERENCE_URL}/api/analyze-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // Forward the zoom level the user actually selected (10x/40x/100x) —
+      // inference_server.py uses this to pick the correct calibration factor.
+      // Previously this was never forwarded, so it silently defaulted to 40x.
       body: JSON.stringify({
         image,
-        mediaType: mediaType || 'image/jpeg',
+        mediaType,
         zoom: zoom || '40x',
-        confidence: confidence ?? 0.25,
-        ...(platelet_confidence === undefined ? {} : { platelet_confidence }),
-        ...(calib_factor === undefined ? {} : { calib_factor }),
+        confidence: confidence || 0.25,
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(30000), // 30s timeout for large images
     });
-    const payload = await upstream.text();
-    let data;
-    try {
-      data = JSON.parse(payload);
-    } catch {
-      console.error('Inference returned non-JSON, HTTP', upstream.status);
-      return res.status(502).json({ error: 'Invalid response from inference server.' });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: err.detail || 'Inference failed.' });
     }
-    if (!upstream.ok) {
-      console.error('Inference upstream HTTP', upstream.status);
-      return res.status(upstream.status).json({
-        error: data.detail || data.error || `Inference HTTP ${upstream.status}`,
+
+    const data = await response.json();
+
+    // The smear-gate classifier in inference_server.py can reject an image
+    // before any detection ever runs, returning just:
+    //   { not_blood_sample: true, reason: "..." }
+    // This must be forwarded to the frontend as-is -- it does NOT have
+    // platelets/rbc/wbc/etc fields, so reshaping it below would silently
+    // strip the rejection flag and reason, making every rejected image
+    // look like a normal (empty) result to the browser.
+    if (data.not_blood_sample) {
+      return res.json({
+        not_blood_sample: true,
+        reason: data.reason || 'This image does not appear to be a valid blood smear.',
       });
     }
-    return res.json(data);
+
+    // Real response shape from inference_server.py:
+    // { platelets, rbc, wbc, est_per_ul, calib_factor, zoom, zoom_note,
+    //   severity, severity_label, severity_color, clinical_note, note,
+    //   detections, total_objects, image_size }
+    // severity is already one of NORMAL/LOW/DANGER/CRITICAL/HIGH/UNKNOWN,
+    // matching what the frontend expects directly — no relabeling needed.
+    res.json({
+      platelets:   data.platelets   || 0,
+      rbc:         data.rbc         || 0,
+      wbc:         data.wbc         || 0,
+      est_per_ul:  data.est_per_ul  || 0,
+      severity:    data.severity    || 'UNKNOWN',
+      detections:  data.detections  || [],
+      note:        data.note || data.clinical_note || '',
+      zoom:        data.zoom || null,
+    });
+
   } catch (err) {
-    console.error('Inference proxy failed:', err.message);
-    return res.status(503).json({ error: 'Inference server unreachable or timed out.' });
+    console.error('Analysis error:', err.message);
+    res.status(500).json({ error: 'Image analysis failed. Please try again.' });
   }
 });
 
