@@ -185,7 +185,18 @@ const chatLimiter = rateLimit({
   message: { error: 'You are sending messages too fast. Please slow down.' },
 });
 
-app.use('/api/', generalLimiter);
+// Camera routes get their own (higher) limiter below: the snapshot-polling fallback
+// in the page legitimately makes ~4 requests/second, which generalLimiter would block.
+app.use('/api/', (req, res, next) =>
+  req.path.startsWith('/camera/') ? next() : generalLimiter(req, res, next));
+
+const cameraLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 400,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many camera requests. Please wait a moment.' },
+});
 
 // ── YOLOv8 Image Analysis (local inference server on port 8000) ───────
 // Requires inference_server.py to be running: python inference_server.py
@@ -204,6 +215,82 @@ app.get('/api/queue-status', async (req, res) => {
   } catch (err) {
     // Non-fatal -- the frontend just won't show live queue info if this fails.
     res.status(503).json({ error: 'Queue status unavailable.' });
+  }
+});
+
+
+// ── Raspberry Pi USB camera (proxied to inference_server.py) ───────────
+// The Pi serves /api/camera/{status,stream,snapshot}. The browser only ever talks to
+// this server, so this just relays them. The stream is piped straight through (it's an
+// endless MJPEG response), and the upstream connection is dropped as soon as the
+// browser disconnects so the Pi can release the camera.
+const MAX_CAMERA_STREAMS = parseInt(process.env.MAX_CAMERA_STREAMS || '3', 10);
+let activeCameraStreams = 0;
+
+function sendCameraError(res, status, message) {
+  // `detail` matches the Pi's own error shape; `error` matches this server's.
+  return res.status(status).json({ error: message, detail: message });
+}
+
+async function relayCameraError(upstream, res) {
+  const e = await upstream.json().catch(() => ({}));
+  return sendCameraError(res, upstream.status, e.detail || e.error || 'Raspberry Pi camera error.');
+}
+
+app.get('/api/camera/status', cameraLimiter, async (req, res) => {
+  try {
+    const r = await fetch(`${INFERENCE_URL}/api/camera/status`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return relayCameraError(r, res);
+    res.set('Cache-Control', 'no-store').json(await r.json());
+  } catch (err) {
+    sendCameraError(res, 503, 'Raspberry Pi camera service is unreachable.');
+  }
+});
+
+app.get('/api/camera/snapshot', cameraLimiter, async (req, res) => {
+  try {
+    const r = await fetch(`${INFERENCE_URL}/api/camera/snapshot`, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return relayCameraError(r, res);
+    const buf = await r.buffer();
+    res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store, max-age=0' }).send(buf);
+  } catch (err) {
+    sendCameraError(res, 503, 'Raspberry Pi camera service is unreachable.');
+  }
+});
+
+app.get('/api/camera/stream', cameraLimiter, async (req, res) => {
+  if (activeCameraStreams >= MAX_CAMERA_STREAMS) {
+    return sendCameraError(res, 429, 'The camera is already being viewed by the maximum number of people. Try again shortly.');
+  }
+  activeCameraStreams++;
+  const controller = new AbortController();
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    activeCameraStreams--;
+    controller.abort();            // closes the connection to the Pi
+  };
+  // Use res (not req) for 'close': on newer Node versions req emits 'close' as soon as a
+  // GET has been read, which would tear the stream down immediately.
+  res.on('close', release);
+
+  try {
+    const r = await fetch(`${INFERENCE_URL}/api/camera/stream`, { signal: controller.signal });
+    if (!r.ok) { await relayCameraError(r, res); return release(); }
+    res.status(200).set({
+      'Content-Type':      r.headers.get('content-type') || 'multipart/x-mixed-replace; boundary=frame',
+      'Cache-Control':     'no-store',
+      'X-Accel-Buffering': 'no',
+    });
+    if (res.flushHeaders) res.flushHeaders();
+    r.body.on('error', () => { release(); res.end(); });
+    r.body.on('end',   () => { release(); res.end(); });
+    r.body.pipe(res);
+  } catch (err) {
+    release();
+    if (!res.headersSent) sendCameraError(res, 503, 'Raspberry Pi camera service is unreachable.');
+    else res.end();
   }
 });
 
