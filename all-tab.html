@@ -3118,7 +3118,7 @@ function _updateCaptureBtnLabel() {
     try { inSession = _fieldSessionActive && _fieldData.length < 10; } catch (_) {}
     label.textContent = inSession ? 'Capture next field' : 'Retake from Pi camera';
   }
-  else label.textContent = 'Capture from Pi camera';
+  else label.innerHTML = '<mark>Capture from Pi camera</mark>';
 }
 
 async function checkRpiCamera() {
