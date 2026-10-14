@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlateletWatch – Register</title>
+<link rel="icon" type="image/png" href="pics/pic2.png">
+<link rel="stylesheet" href="design-tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Map this page's legacy palette onto the shared design system */
+  :root {
+    --red-deep: var(--c-700);
+    --red-main: var(--c-600);
+    --red-mid:  var(--c-500);
+    --red-soft: var(--c-300);
+    --red-pale: var(--c-50);
+    --red-panel:var(--c-800);
+    --white: var(--surface);
+    --gray-1: var(--surface-2);
+    --gray-2: var(--line-2);
+    --gray-3: var(--ink-3);
+    --text:    var(--ink);
+  }
+
+  body {
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background:
+      radial-gradient(60% 60% at 85% 0%, var(--c-50) 0%, transparent 60%),
+      var(--surface-2);
+    padding: 24px 12px;
+  }
+
+  .card {
+    display: flex;
+    width: 900px;
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+    animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(28px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* LEFT PANEL */
+  .panel {
+    width: 280px;
+    flex-shrink: 0;
+    background: linear-gradient(160deg, var(--c-700) 0%, var(--c-800) 55%, var(--c-950) 100%);
+    padding: 36px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: visible;
+  }
+  .panel::before {
+    content:''; position:absolute; inset:0;
+    background: radial-gradient(ellipse at 30% 15%, rgba(255,255,255,.12) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .logo-row { display:flex; align-items:center; gap:10px; margin-bottom:auto; }
+  .logo-icon {
+    width:48px; height:48px; border-radius:12px;
+    background:rgba(255,255,255,.18);
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px;
+    overflow:hidden;
+  }
+  .logo-icon img {
+    width:100%; height:100%; object-fit:cover; border-radius:12px;
+  }
+  .logo-text { color:var(--white); }
+  .logo-text strong { font-size:17px; font-weight:700; display:block; }
+  .logo-text strong span { color:var(--red-soft); }
+  .logo-text small { font-size:9.5px; letter-spacing:.12em; opacity:.75; text-transform:uppercase; }
+
+  .panel-headline { color:var(--white); margin: 28px 0 10px; line-height:1.2; }
+  .panel-headline em {
+    font-family:var(--font-ui); font-style:italic; font-weight:600;
+    font-size:28px; display:block;
+  }
+  .panel-headline strong { font-size:22px; font-weight:700; display:block; }
+  .panel-sub { color:rgba(255,255,255,.72); font-size:12px; line-height:1.55; margin-bottom:20px; }
+  .features { list-style:none; display:flex; flex-direction:column; gap:7px; margin-bottom:24px; }
+  .features li {
+    color:rgba(255,255,255,.88); font-size:11.5px;
+    display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,.09); border-radius:var(--r-full); padding:6px 11px;
+  }
+  .features li::before { content:'●'; color:var(--red-soft); font-size:7px; flex-shrink:0; }
+  .disclaimer {
+    background:rgba(255,220,100,.12); border-radius:var(--r-sm); padding:10px 11px;
+    color:rgba(255,255,255,.65); font-size:10px; line-height:1.5;
+    display:flex; gap:7px; margin-top:auto;
+    flex-shrink:0; overflow:visible; word-break:break-word;
+  }
+  .disclaimer span { font-size:13px; flex-shrink:0; }
+  .disclaimer span:last-child { font-size:10px; flex-shrink:1; min-width:0; }
+
+  /* RIGHT FORM */
+  .form-side {
+    flex:1; background:var(--white);
+    padding:32px 36px 28px;
+    display:flex; flex-direction:column;
+    position:relative; overflow-y:auto;
+  }
+  .back-btn {
+    position:absolute; top:16px; right:20px;
+    background:none; border:none; cursor:pointer;
+    color:var(--red-main); font-size:18px;
+    width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+    border-radius:50%; transition: background .2s;
+  }
+  .back-btn:hover { background:var(--red-pale); }
+
+  .form-title { font-size:24px; font-weight:700; color:var(--text); margin-bottom:2px; }
+  .form-sub   { font-size:12.5px; color:var(--gray-3); margin-bottom:18px; }
+
+  .tab-row {
+    display:flex; background:var(--surface-3); border:1px solid var(--line); border-radius:var(--r-full);
+    padding:4px; margin-bottom:22px;
+  }
+  .tab {
+    flex:1; text-align:center; padding:8px;
+    border-radius:26px; font-size:13px; font-weight:500;
+    cursor:pointer; border:none; background:none;
+    color:var(--gray-3); transition: all .25s var(--ease-out);
+    text-decoration:none; display:block; line-height:1;
+  }
+  .tab.active { background:var(--white); color:var(--red-main); box-shadow:var(--shadow-sm); }
+
+  /* GRID */
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .grid-1 { margin-bottom:12px; }
+
+  .field label {
+    display:block; font-size:10.5px; font-weight:600;
+    letter-spacing:.07em; text-transform:uppercase;
+    color:var(--gray-3); margin-bottom:5px;
+  }
+  .input-wrap {
+    display:flex; align-items:center;
+    border:1.5px solid var(--gray-2);
+    border-radius:var(--r-sm); background:var(--surface);
+    transition: border-color .2s, box-shadow .2s;
+    overflow:hidden;
+  }
+  .input-wrap:focus-within {
+    border-color:var(--red-main);
+    box-shadow: var(--ring);
+  }
+  .input-wrap .ico { padding:0 10px; color:var(--gray-3); font-size:14px; flex-shrink:0; display:flex; align-items:center; }
+  .input-wrap input, .input-wrap select {
+    flex:1; border:none; background:none; outline:none;
+    font-family:var(--font-ui); font-size:13px; color:var(--text);
+    padding:10px 0; min-width:0;
+  }
+  .input-wrap select { padding:10px 8px 10px 0; cursor:pointer; }
+  .input-wrap input::placeholder { color:var(--gray-3); }
+  .toggle-pw {
+    background:none; border:none; cursor:pointer;
+    padding:0 10px; color:var(--gray-3); font-size:14px;
+    transition: color .2s;
+  }
+  .toggle-pw:hover { color:var(--red-main); }
+  .toggle-pw svg { overflow:visible; transition: transform .15s var(--ease-out); }
+  .toggle-pw:active svg { transform:scale(.85); }
+  .toggle-pw:focus { outline:none; }
+  .toggle-pw:focus-visible { outline:2px solid var(--red-main); outline-offset:-2px; border-radius:6px; }
+  .eye-slash {
+    stroke-dasharray:16; stroke-dashoffset:16;
+    transition: stroke-dashoffset .3s var(--ease-out);
+  }
+  .toggle-pw.revealed { color:var(--red-main); }
+  .toggle-pw.revealed .eye-slash { stroke-dashoffset:0; }
+  .eye-shape, .eye-pupil { transform-origin:8px 8px; }
+  @keyframes eyeBlink { 0%{transform:scaleY(1);} 50%{transform:scaleY(.1);} 100%{transform:scaleY(1);} }
+  .toggle-pw.blink .eye-shape, .toggle-pw.blink .eye-pupil { animation: eyeBlink .3s ease; }
+  .btn-primary:disabled { opacity:.7; cursor:not-allowed; transform:none; box-shadow:var(--shadow-sm); }
+
+  /* loading spinner for dropdowns */
+  .dd-loading { display:none; padding:0 10px; }
+  .dd-loading.show { display:block; }
+  .spinner {
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--red-soft);
+    border-top-color:var(--red-main);
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .terms-row {
+    display:flex; align-items:flex-start; gap:8px;
+    margin-bottom:16px; font-size:12px; color:var(--gray-3);
+  }
+  .terms-row input { accent-color:var(--red-main); margin-top:2px; flex-shrink:0; }
+  .terms-row a { color:var(--red-main); font-weight:600; text-decoration:none; }
+  .terms-row a:hover { text-decoration:underline; }
+
+  .btn-primary {
+    width:100%; padding:12px;
+    background:var(--red-main);
+    color:var(--white); border:none; border-radius:var(--r-sm);
+    font-family:var(--font-ui); font-size:15px; font-weight:600;
+    cursor:pointer; letter-spacing:-.005em;
+    display:flex; align-items:center; justify-content:center;
+    transition: background .2s var(--ease-out), transform .15s var(--ease-out), box-shadow .2s var(--ease-out);
+    box-shadow: var(--shadow-sm);
+    margin-bottom:12px;
+  }
+  .btn-primary:hover { background:var(--red-deep); transform:translateY(-2px); box-shadow:var(--shadow-accent); }
+  .btn-primary:active { transform:translateY(0); }
+
+  .bottom-note { text-align:center; font-size:12px; color:var(--gray-3); }
+  .bottom-note a { color:var(--red-main); font-weight:600; text-decoration:none; }
+  .bottom-note a:hover { text-decoration:underline; }
+
+  /* password strength meter */
+  .pw-meter { display:none; align-items:center; gap:8px; margin-top:6px; }
+  .pw-meter.show { display:flex; }
+  .pw-bars { flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+  .pw-bars span { height:4px; border-radius:4px; background:var(--gray-2); transition:background .25s; }
+  .pw-label { font-size:11px; font-weight:600; min-width:48px; text-align:right; transition:color .25s; }
+  .pw-meter.weak   .pw-bars span:nth-child(1) { background:#ef4444; }
+  .pw-meter.weak   .pw-label { color:#ef4444; }
+  .pw-meter.medium .pw-bars span:nth-child(-n+2) { background:#f59e0b; }
+  .pw-meter.medium .pw-label { color:#d97706; }
+  .pw-meter.strong .pw-bars span { background:#22c55e; }
+  .pw-meter.strong .pw-label { color:#16a34a; }
+
+  /* validation */
+  .field.error .input-wrap { border-color:var(--red-main); }
+  .field .err-msg { font-size:10px; color:var(--red-main); margin-top:3px; display:none; }
+  .field.error .err-msg { display:block; }
+
+  @media(max-width:700px){
+    body { padding:12px 8px; }
+    .card { flex-direction:column; width:100%; }
+    .panel { width:100%; padding:22px 18px; }
+    .form-side { padding:24px 18px; }
+    .grid-3, .grid-2 { grid-template-columns:1fr; }
+  }
+/* ── Terms / Privacy modal ── */
+  .legal-overlay { display:none; position:fixed; inset:0; background:rgba(26,15,15,.55); backdrop-filter:blur(4px); z-index:1100; align-items:center; justify-content:center; padding:16px; }
+  .legal-overlay.show { display:flex; }
+  .legal-modal { background:var(--white); border-radius:var(--r-lg, 18px); width:100%; max-width:640px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 32px 80px rgba(185,28,28,.22), 0 4px 20px rgba(0,0,0,.12); animation: legalIn .35s cubic-bezier(.22,1,.36,1) both; overflow:hidden; }
+  .legal-head { padding:22px 26px 0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .legal-head h2 { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-.01em; }
+  .legal-head p { font-size:12px; color:var(--gray-3); margin-top:3px; }
+  .legal-close { background:none; border:1px solid var(--gray-2); border-radius:50%; width:32px; height:32px; flex-shrink:0; cursor:pointer; font-size:18px; line-height:1; color:var(--gray-3); transition:all .15s; }
+  .legal-close:hover { color:var(--red-main); border-color:var(--red-main); }
+  .legal-tabs { display:flex; gap:4px; padding:14px 26px 0; border-bottom:1px solid var(--gray-2); }
+  .legal-tab { background:none; border:none; padding:9px 14px; font:inherit; font-size:13px; font-weight:600; color:var(--gray-3); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s; }
+  .legal-tab:hover { color:var(--text); }
+  .legal-tab.active { color:var(--red-main); border-bottom-color:var(--red-main); }
+  .legal-body { padding:18px 26px 8px; overflow-y:auto; font-size:13px; line-height:1.7; color:var(--text); -webkit-overflow-scrolling:touch; }
+  .legal-body h3 { font-size:13.5px; font-weight:700; margin:18px 0 5px; color:var(--text); }
+  .legal-body h3:first-child { margin-top:0; }
+  .legal-body p, .legal-body li { color:var(--gray-3); overflow-wrap:anywhere; }
+  .legal-body p { margin-bottom:6px; }
+  .legal-body ul { padding-left:18px; margin-bottom:6px; }
+  .legal-body li { margin-bottom:3px; }
+  .legal-note { background:#fff8e7; border:1px solid #f5c842; border-radius:10px; padding:10px 12px; font-size:12px; color:#7a5200 !important; margin-bottom:10px; }
+  .legal-foot { padding:14px 26px 20px; display:flex; justify-content:flex-end; border-top:1px solid var(--gray-2); }
+  .legal-foot .btn-primary { width:auto; padding:11px 26px; margin:0; }
+  @media (max-width:520px) { .legal-head, .legal-tabs, .legal-body, .legal-foot { padding-left:18px; padding-right:18px; } .legal-modal { max-height:94vh; } }
+  @keyframes legalIn { from { opacity:0; transform:scale(.94) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .legal-foot { gap:10px; flex-wrap:wrap; }
+  .legal-foot .btn-primary, .legal-foot .legal-btn-outline { width:auto; margin:0; padding:11px 24px; font-size:14px; }
+  .legal-btn-outline { background:none; border:1.5px solid var(--gray-2); border-radius:var(--r-sm); color:var(--gray-3); font-family:var(--font-ui); font-weight:600; cursor:pointer; transition:all .15s; }
+  .legal-btn-outline:hover { border-color:var(--red-main); color:var(--red-main); }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <div class="logo-row">
+      <div class="logo-icon"><img src="pics/pic2.png" alt="PlateletWatch Logo"></div>
+      <div class="logo-text">
+        <strong>Platelet<span>Watch</span></strong>
+        <small>Dengue Early Detection</small>
+      </div>
+    </div>
+    <div class="panel-headline">
+      <em>Monitor Platelets.</em>
+      <strong>Detect Risks Early.</strong>
+    </div>
+    <p class="panel-sub">A microscope-integrated web application that supports early dengue detection through platelet count analysis from blood samples.</p>
+    <ul class="features">
+      <li>Real-time platelet count tracking</li>
+      <li>Automated dengue risk stratification</li>
+      <li>AI-assisted blood analysis</li>
+      <li>Secure patient data management</li>
+    </ul>
+    <div class="disclaimer">
+      <span><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.6 14.8 13.6H1.2L8 1.6Z" stroke-linejoin="round"/><path d="M8 6.2V9.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".15" fill="currentColor" stroke="none"/></svg></span>
+      <span>Disclaimer: This system is intended for early screening and detection purposes only. It does not replace professional medical diagnosis, treatment, or consultation.</span>
+    </div>
+  </div>
+
+  <!-- RIGHT FORM -->
+  <div class="form-side">
+    <button class="back-btn" onclick="history.back()" title="Go back"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.6 3.2 4.4 8l5.2 4.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+
+    <div id="reg-form-wrap">
+    <h1 class="form-title">Create your account</h1>
+    <p class="form-sub">Fill in the details below to register.</p>
+
+    <div class="tab-row">
+      <a href="/signin" class="tab">Sign In</a>
+      <a href="/register" class="tab active">Register</a>
+    </div>
+
+    <form id="regForm" onsubmit="handleSubmit(event)" novalidate>
+
+      <!-- Name -->
+      <div class="grid-3">
+        <div class="field" id="f-lname">
+          <label>Last Name</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="lname" name="lname" placeholder="dela Cruz" required></div>
+          <span class="err-msg">Required</span>
+        </div>
+        <div class="field" id="f-fname">
+          <label>First Name</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="fname" name="fname" placeholder="Juan" required></div>
+          <span class="err-msg">Required</span>
+        </div>
+        <div class="field">
+          <label>Middle Name</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.2" r="2.8"/><path d="M2.4 14.2c.9-3 3-4.6 5.6-4.6s4.7 1.6 5.6 4.6" stroke-linecap="round"/></svg></span><input type="text" id="mname" name="mname" placeholder="Santos"></div>
+        </div>
+      </div>
+
+      <!-- Street / Province -->
+      <div class="grid-2">
+        <div class="field">
+          <label>House No. / Street</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7.4 8 2l6 5.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.6 6.6V14h8.8V6.6" stroke-linejoin="round"/></svg></span><input type="text" name="street" placeholder="123 Rizal St."></div>
+        </div>
+        <div class="field" id="f-prov">
+          <label>Province</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m1.6 3 4-1.4 4.8 1.4 4-1.4v11.4l-4 1.4-4.8-1.4-4 1.4V3Z" stroke-linejoin="round"/><path d="M5.6 1.8v11.2M10.4 3.2v11.2"/></svg></span>
+            <select id="sel-prov" name="province">
+              <option value="">Loading Provinces…</option>
+            </select>
+            <div class="dd-loading" id="load-prov"><div class="spinner"></div></div>
+          </div>
+          <span class="err-msg">Select a Province</span>
+        </div>
+      </div>
+
+      <!-- City / Barangay -->
+      <div class="grid-2">
+        <div class="field" id="f-city">
+          <label>City / Municipality</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 14.2V6l4-2.4v10.6M9.6 14.2V1.8l4.8 2.4v10"/><path d="M3.6 6.6h0M3.6 9h0M3.6 11.4h0M11.6 5h0M11.6 7.6h0M11.6 10.2h0" stroke-linecap="round" stroke-width="1.8"/></svg></span>
+            <select id="sel-city" name="city" disabled>
+              <option value="">Select City/Municipality</option>
+            </select>
+            <div class="dd-loading" id="load-city"><div class="spinner"></div></div>
+          </div>
+          <span class="err-msg">Select a City</span>
+        </div>
+        <div class="field" id="f-brgy">
+          <label>Barangay</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 14.4S13 9.8 13 6.2A5 5 0 0 0 3 6.2C3 9.8 8 14.4 8 14.4Z" stroke-linejoin="round"/><circle cx="8" cy="6.2" r="1.7"/></svg></span>
+            <select id="sel-brgy" name="barangay" disabled>
+              <option value="">Select Barangay</option>
+            </select>
+            <div class="dd-loading" id="load-brgy"><div class="spinner"></div></div>
+          </div>
+          <span class="err-msg">Select a Barangay</span>
+        </div>
+      </div>
+
+      <!-- Age / Sex / Contact / Birthdate -->
+      <div class="grid-2">
+        <div class="field" id="f-age">
+          <label>Age</label>
+          <div class="input-wrap"><span class="ico">#</span><input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="e.g. 25" autocomplete="off" required></div>
+          <span class="err-msg">Enter a Valid Age (1–99, numbers only)</span>
+        </div>
+        <div class="field">
+          <label>Sex</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.4" cy="8.4" r="3.6"/><path d="M9 5.6 13.4 1.2M13.4 1.2H10M13.4 1.2v3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <select name="sex">
+              <option value="">Sex</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field" id="f-contact">
+          <label>Contact Number</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.4c0-.6.5-1 1-.9l2 .4c.4 0 .8.4.8.8l.2 1.8c0 .4-.1.7-.4.9L5.4 6.4c.8 1.9 2.3 3.4 4.2 4.2l1-1.2c.2-.3.6-.4 1-.4l1.8.2c.4 0 .8.4.8.8l.4 2c.1.5-.3 1-.9 1C7.6 12.9 3.1 8.4 3 2.4Z" stroke-linejoin="round"/></svg></span><input type="tel" id="contact" name="contact" inputmode="numeric" pattern="[0-9]*" maxlength="11" placeholder="09XXXXXXXXX" autocomplete="tel"></div>
+          <span class="err-msg">Enter exactly 11 digits, numbers only</span>
+        </div>
+        <div class="field" id="f-bdate">
+          <label>Birth Date</label>
+          <div class="input-wrap" style="gap:2px;">
+            <span class="ico"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.6" y="2.8" width="12.8" height="11.2" rx="1.2"/><path d="M1.6 6h12.8M5 1.4v2.4M11 1.4v2.4" stroke-linecap="round"/></svg></span>
+            <select id="bd-month" name="bd_month" style="flex:1.4; padding:10px 4px;">
+              <option value="">Month</option>
+            </select>
+            <select id="bd-day" name="bd_day" style="flex:1; padding:10px 4px;">
+              <option value="">Day</option>
+            </select>
+            <select id="bd-year" name="bd_year" style="flex:1.2; padding:10px 4px;">
+              <option value="">Year</option>
+            </select>
+          </div>
+          <span class="err-msg">Select Complete Birthdate</span>
+        </div>
+      </div>
+
+      <!-- Credentials -->
+      <div class="grid-1">
+        <div class="field" id="f-email">
+          <label>Email Address</label>
+          <div class="input-wrap"><span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.4" y="3" width="13.2" height="10" rx="1.4"/><path d="m1.6 3.6 6.4 5 6.4-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><input type="email" name="email" placeholder="juan@email.com" required></div>
+          <span class="err-msg">Enter a Valid Email</span>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field" id="f-pw">
+          <label>Password</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
+            <input type="password" id="pw1" name="password" placeholder="••••••••" required>
+            <button type="button" class="toggle-pw" onclick="togglePw('pw1',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
+          </div>
+          <div class="pw-meter" id="pw-meter" aria-live="polite">
+            <div class="pw-bars"><span></span><span></span><span></span></div>
+            <span class="pw-label" id="pw-label"></span>
+          </div>
+          <span class="err-msg">Minimum 8 Characters</span>
+        </div>
+        <div class="field" id="f-cpw">
+          <label>Confirm Password</label>
+          <div class="input-wrap">
+            <span class="ico"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.4"/><path d="M5 7V4.6a3 3 0 0 1 6 0V7" stroke-linecap="round"/></svg></span>
+            <input type="password" id="pw2" name="confirm_password" placeholder="••••••••" required>
+            <button type="button" class="toggle-pw" onclick="togglePw('pw2',this)"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><path class="eye-shape" d="M1 8s2.6-4.8 7-4.8S15 8 15 8s-2.6 4.8-7 4.8S1 8 1 8Z" stroke-linejoin="round"/><circle class="eye-pupil" cx="8" cy="8" r="2"/><path class="eye-slash" d="M2.5 13.5 13.5 2.5" stroke-linecap="round"/></svg></button>
+          </div>
+          <span class="err-msg">Passwords do not match</span>
+        </div>
+      </div>
+
+      <!-- Terms -->
+      <div class="terms-row">
+        <input type="checkbox" id="terms" required>
+        <label for="terms">
+          I agree to the <a href="#" onclick="openLegal('terms');return false;">Terms and Services</a> and <a href="#" onclick="openLegal('privacy');return false;">Privacy Policy</a>.
+          Patient data will be handled per the Data Privacy Act of 2012 (RA 10173).
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary">Create Account</button>
+    </form>
+
+    <p class="bottom-note">Already have an account? <a href="/signin">Sign in here</a></p>
+    </div><!-- /reg-form-wrap -->
+
+    <!-- VERIFY EMAIL VIEW (shown after successful sign-up) -->
+    <div id="verify-view" style="display:none; text-align:center; padding:24px 4px;">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--red-pale);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="var(--red-main)" stroke-width="1.6"><path d="M3 6.5h18v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Z" stroke-linejoin="round"/><path d="m3.5 6.8 8.5 6.4 8.5-6.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1 class="form-title" style="text-align:center;">Check your email</h1>
+      <p class="form-sub" style="text-align:center; margin-bottom:6px;">We've sent a confirmation link to</p>
+      <p style="font-weight:700; font-size:14px; color:var(--text); margin-bottom:18px;" id="verify-email-text"></p>
+      <p style="font-size:12.5px; color:var(--gray-3); line-height:1.6; margin-bottom:22px;">
+        Click the link in that email to verify your address. Once verified, you can sign in and access your dashboard.
+      </p>
+      <div id="verify-alert" style="display:none; margin-bottom:14px; padding:10px 14px; border-radius:8px; font-size:13px;"></div>
+      <button type="button" class="btn-primary" id="resend-btn" onclick="resendVerification()" style="background:var(--white); color:var(--red-main); border:1.5px solid var(--red-main);">Resend confirmation email</button>
+      <p class="bottom-note" style="margin-top:14px;">Already verified? <a href="/signin">Sign in here</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- Terms of Service / Privacy Policy -->
+<div class="legal-overlay" id="legal-modal" role="dialog" aria-modal="true" aria-labelledby="legal-title" onclick="if(event.target===this)closeLegal()">
+  <div class="legal-modal">
+    <div class="legal-head">
+      <div>
+        <h2 id="legal-title">Terms of Service</h2>
+        <p>PlateletWatch · Last updated October 6, 2026</p>
+      </div>
+      <button type="button" class="legal-close" onclick="closeLegal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="legal-tabs" role="tablist">
+      <button type="button" class="legal-tab active" id="legal-tab-terms" role="tab" onclick="openLegal('terms')">Terms of Service</button>
+      <button type="button" class="legal-tab" id="legal-tab-privacy" role="tab" onclick="openLegal('privacy')">Privacy Policy</button>
+    </div>
+    <div class="legal-body" id="legal-body-terms">
+      <p class="legal-note"><strong>Important:</strong> PlateletWatch is an early screening and educational tool. It does not provide a medical diagnosis and does not replace a licensed healthcare professional.</p>
+
+      <h3>1. Acceptance of these terms</h3>
+      <p>By creating an account or signing in to PlateletWatch, you agree to these Terms of Service and to our Privacy Policy. If you do not agree, please do not use the service.</p>
+
+      <h3>2. What PlateletWatch does</h3>
+      <p>PlateletWatch uses AI to detect and count platelets, red blood cells and white blood cells in microscope images of blood smears, estimates a platelet count per µL, and compares it with WHO dengue severity thresholds. You can also record confirmatory test results (such as NS1 antigen and Dengue IgM/IgG) and notes from a doctor or medical technologist.</p>
+
+      <h3>3. Not medical advice</h3>
+      <ul>
+        <li>Results are estimates and may be inaccurate, especially with poor image quality, focus, lighting or staining.</li>
+        <li>Do not start, stop or change any treatment based only on this app.</li>
+        <li>If you or someone else shows dengue warning signs (severe abdominal pain, persistent vomiting, bleeding, drowsiness or restlessness, difficulty breathing) or the app reports a Danger or Critical result, seek medical care immediately.</li>
+      </ul>
+
+      <h3>4. Your account</h3>
+      <p>You must provide accurate information and keep your login details private. You are responsible for activity under your account. For security, repeated incorrect password attempts temporarily lock sign-in, and inactive sessions are signed out automatically.</p>
+
+      <h3>5. Acceptable use</h3>
+      <ul>
+        <li>Upload only images and enter only patient information that you are authorized to use, with the patient’s consent where required.</li>
+        <li>Do not use the service for unlawful purposes, to harm others, or to attempt to break, overload or gain unauthorized access to it.</li>
+        <li>Do not copy, resell or reverse-engineer the service except as allowed by law.</li>
+      </ul>
+
+      <h3>6. Your content</h3>
+      <p>You keep ownership of the images and information you submit. You allow PlateletWatch to store and process them only to provide the service to you, such as analysis, history, and report or image export.</p>
+
+      <h3>7. Availability and liability</h3>
+      <p>The service is provided “as is” and “as available”. We do not guarantee uninterrupted or error-free operation. To the extent permitted by law, PlateletWatch and its developers are not liable for any loss or harm arising from use of, or reliance on, the results.</p>
+
+      <h3>8. Suspension and termination</h3>
+      <p>We may suspend or close accounts that break these terms or put the service or other users at risk. You may stop using the service and request deletion of your account at any time.</p>
+
+      <h3>9. Changes to these terms</h3>
+      <p>We may update these terms from time to time. Continued use after an update means you accept the revised terms.</p>
+
+      <h3>10. Governing law and contact</h3>
+      <p>These terms are governed by the laws of the Republic of the Philippines. Questions? Contact the PlateletWatch team at <strong>shernanayceemataiii@gmail.com</strong>.</p>
+    </div>
+    <div class="legal-body" id="legal-body-privacy" style="display:none;">
+      <p class="legal-note"><strong>In short:</strong> we collect only what is needed to run PlateletWatch, we protect it, and we never sell it.</p>
+
+      <h3>1. Information we collect</h3>
+      <ul>
+        <li><strong>Account details:</strong> name, email address, and profile details you provide (for example birthdate and address).</li>
+        <li><strong>Health-related information:</strong> microscope images, platelet / RBC / WBC counts, estimated counts and severity, patient names, NS1 and Dengue IgM/IgG results, and doctor or medical technologist notes that you enter.</li>
+        <li><strong>Sign-in information:</strong> sign-in events and the sign-in method used (email or Google).</li>
+        <li><strong>On your device:</strong> small items stored in your browser, such as your preferences, the sign-in attempt counter, and session information.</li>
+      </ul>
+
+      <h3>2. How we use it</h3>
+      <ul>
+        <li>To create and secure your account and sign you in.</li>
+        <li>To analyze images, calculate results, and keep your test history.</li>
+        <li>To produce the PDF reports and annotated images that you request.</li>
+        <li>To maintain and improve the reliability and safety of the service.</li>
+      </ul>
+
+      <h3>3. Sensitive personal information</h3>
+      <p>Health information is treated as sensitive personal information under the Data Privacy Act of 2012 (Republic Act No. 10173). By entering patient details, you confirm that you have the right and the consent needed to do so.</p>
+
+      <h3>4. Storage and security</h3>
+      <p>Your data is stored with our cloud database and storage provider (Supabase) and sent over encrypted connections. Access is limited to your signed-in account. No system is completely secure, so please keep your password private and sign out on shared devices.</p>
+
+      <h3>5. Sharing</h3>
+      <p>We do not sell your personal information. We share it only with service providers that help run the app (such as hosting and, if you choose it, Google sign-in), when required by law, or when you choose to export or share a report yourself.</p>
+
+      <h3>6. Retention and deletion</h3>
+      <p>We keep your records until you delete them or your account is removed. Deleting a record from History removes it from your account.</p>
+
+      <h3>7. Your rights</h3>
+      <p>You may ask to access, correct or delete your personal data, object to or restrict its processing, and withdraw your consent. You also have the right to file a complaint with the National Privacy Commission of the Philippines.</p>
+
+      <h3>8. Age</h3>
+      <p>PlateletWatch is intended for adults, including healthcare students and professionals. If you are under 18, please use it only with a parent or guardian.</p>
+
+      <h3>9. Changes and contact</h3>
+      <p>We may update this policy and will change the date above when we do. For privacy questions or requests, contact <strong>shernanayceemataiii@gmail.com</strong>.</p>
+    </div>
+    <div class="legal-foot">
+      <button type="button" class="legal-btn-outline" onclick="closeLegal()">Close</button>
+      <button type="button" class="btn-primary" onclick="agreeLegal()">I agree</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.config.js"></script>
+
+<script>
+// ── BIRTHDATE DROPDOWNS ──────────────────────────────────────────────
+const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const mSel = document.getElementById('bd-month');
+months.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; mSel.appendChild(o); });
+
+function populateDays(year, month) {
+  const dSel = document.getElementById('bd-day');
+  const cur = dSel.value;
+  dSel.innerHTML = '<option value="">Day</option>';
+  const count = (month && year) ? new Date(year, month, 0).getDate() : 31;
+  for(let d=1; d<=count; d++) { const o=document.createElement('option'); o.value=d; o.textContent=d; if(d==cur) o.selected=true; dSel.appendChild(o); }
+}
+populateDays(null,null);
+
+const ySel = document.getElementById('bd-year');
+const curY = new Date().getFullYear();
+for(let y=curY; y>=1900; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; ySel.appendChild(o); }
+
+mSel.addEventListener('change', () => populateDays(ySel.value, mSel.value));
+ySel.addEventListener('change', () => populateDays(ySel.value, mSel.value));
+
+// ── PSGC API (Philippine Standard Geographic Code) ────────────────────
+const BASE = 'https://psgc.cloud/api';
+
+async function apiGet(url) {
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('API error');
+  return r.json();
+}
+
+function loading(id, show) {
+  document.getElementById('load-'+id).classList.toggle('show', show);
+}
+
+function clearSelect(sel, placeholder, disabled=false) {
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  sel.disabled = disabled;
+}
+
+async function loadProvinces() {
+  loading('prov', true);
+  const pSel = document.getElementById('sel-prov');
+  try {
+    const data = await apiGet(`${BASE}/provinces/`);
+    const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
+    pSel.innerHTML = '<option value="">Select Province</option>';
+    sorted.forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.code;
+      o.textContent = p.name;
+      pSel.appendChild(o);
+    });
+  } catch(e) {
+    pSel.innerHTML = '<option value="">Could not load provinces</option>';
+  } finally {
+    loading('prov', false);
+  }
+}
+
+document.getElementById('sel-prov').addEventListener('change', async function() {
+  const code = this.value;
+  const cSel = document.getElementById('sel-city');
+  clearSelect(cSel, 'Loading cities…', true);
+  clearSelect(document.getElementById('sel-brgy'), 'Select Barangay', true);
+  if(!code) { clearSelect(cSel,'Select City/Municipality',true); return; }
+  loading('city', true);
+  try {
+    const data = await apiGet(`${BASE}/provinces/${code}/cities-municipalities/`);
+    const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
+    cSel.innerHTML = '<option value="">Select City/Municipality</option>';
+    sorted.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.code;
+      o.textContent = c.name;
+      cSel.appendChild(o);
+    });
+    cSel.disabled = false;
+  } catch(e) {
+    cSel.innerHTML = '<option value="">Could not load cities</option>';
+  } finally {
+    loading('city', false);
+  }
+});
+
+document.getElementById('sel-city').addEventListener('change', async function() {
+  const code = this.value;
+  const bSel = document.getElementById('sel-brgy');
+  clearSelect(bSel, 'Loading barangays…', true);
+  if(!code) { clearSelect(bSel,'Select Barangay',true); return; }
+  loading('brgy', true);
+  try {
+    const data = await apiGet(`${BASE}/cities-municipalities/${code}/barangays/`);
+    const sorted = data.sort((a,b)=>a.name.localeCompare(b.name));
+    bSel.innerHTML = '<option value="">Select Barangay</option>';
+    sorted.forEach(b => {
+      const o = document.createElement('option');
+      o.value = b.code;
+      o.textContent = b.name;
+      bSel.appendChild(o);
+    });
+    bSel.disabled = false;
+  } catch(e) {
+    bSel.innerHTML = '<option value="">Could not load barangays</option>';
+  } finally {
+    loading('brgy', false);
+  }
+});
+
+// init
+loadProvinces();
+
+// ── INPUT RESTRICTIONS (Age: max 2 digits, Contact: max 11 digits) ───
+function digitsOnly(el, maxLen) {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g, '').slice(0, maxLen);
+  });
+  el.addEventListener('keydown', e => {
+    // block letters / symbols (allow control keys and shortcuts)
+    if (e.key.length === 1 && !/\d/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+  });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+    const start = el.selectionStart, end = el.selectionEnd;
+    el.value = (el.value.slice(0, start) + t + el.value.slice(end)).slice(0, maxLen);
+  });
+}
+digitsOnly(document.getElementById('age'), 2);
+digitsOnly(document.getElementById('contact'), 11);
+
+// ── NAME FIELDS: no numbers (letters, spaces, . ' - only) ─────────────
+function lettersOnly(el) {
+  const bad = /[^\p{L}\s.'’\-]/gu;
+  el.addEventListener('input', () => { el.value = el.value.replace(bad, ''); });
+  el.addEventListener('keydown', e => {
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && /[^\p{L}\s.'’\-]/u.test(e.key)) e.preventDefault();
+  });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text').replace(bad, '');
+    const start = el.selectionStart, end = el.selectionEnd;
+    el.value = el.value.slice(0, start) + t + el.value.slice(end);
+    el.setSelectionRange(start + t.length, start + t.length);
+  });
+}
+['lname','fname','mname'].forEach(id => lettersOnly(document.getElementById(id)));
+
+// ── PASSWORD STRENGTH METER ──────────────────────────────────────────
+document.getElementById('pw1').addEventListener('input', function() {
+  const v = this.value;
+  const meter = document.getElementById('pw-meter');
+  const label = document.getElementById('pw-label');
+  meter.classList.remove('weak','medium','strong','show');
+  if (!v) { label.textContent = ''; return; }
+
+  const checks = [
+    /[a-z]/.test(v) && /[A-Z]/.test(v),   // upper + lower
+    /\d/.test(v),                          // number
+    /[^A-Za-z0-9]/.test(v),                // symbol
+    v.length >= 12                         // long
+  ].filter(Boolean).length;
+
+  let level = 'weak';
+  if (v.length >= 8 && checks >= 3) level = 'strong';
+  else if (v.length >= 8 && checks >= 2) level = 'medium';
+
+  meter.classList.add('show', level);
+  label.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+});
+
+// ── PASSWORD TOGGLE ──────────────────────────────────────────────────
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.classList.toggle('revealed', show);
+  btn.classList.remove('blink');
+  void btn.offsetWidth;
+  btn.classList.add('blink');
+}
+
+// ── FORM SUBMIT ───────────────────────────────────────────────────────
+async function handleSubmit(e) {
+  e.preventDefault();
+  let valid = true;
+
+  // Client-side validation
+  const checks = [
+    { id:'f-lname', el:e.target.lname,    test: v=>v.trim() },
+    { id:'f-fname', el:e.target.fname,    test: v=>v.trim() },
+    { id:'f-email', el:e.target.email,    test: v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+    { id:'f-pw',    el:e.target.password, test: v=>v.length>=8 },
+    { id:'f-age',   el:e.target.age,      test: v=>/^\d{1,2}$/.test(v) && +v > 0 },
+    { id:'f-contact', el:e.target.contact,  test: v=>/^\d{11}$/.test(v) },
+  ];
+  checks.forEach(c => {
+    const ok = c.test(c.el.value);
+    document.getElementById(c.id).classList.toggle('error', !ok);
+    if(!ok) valid=false;
+  });
+
+  const pw1 = document.getElementById('pw1').value;
+  const pw2 = document.getElementById('pw2').value;
+  const cpwOk = pw1===pw2 && pw2.length>0;
+  document.getElementById('f-cpw').classList.toggle('error', !cpwOk);
+  if(!cpwOk) valid=false;
+
+  if(!document.getElementById('terms').checked) {
+    valid=false;
+    showAlert('Please agree to the Terms and Services to continue.');
+  }
+
+  if(!valid) return;
+
+  // Disable button and show loading state
+  const btn = document.querySelector('.btn-primary[type=submit]');
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+
+  const form   = e.target;
+  const email  = form.email.value.trim();
+  const month  = form.bd_month.value;
+  const day    = form.bd_day.value;
+  const year   = form.bd_year.value;
+  const bdate  = (month && day && year)
+                   ? `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+                   : null;
+
+  // ── 1. Create auth user ──────────────────────────────────────────────
+  const { data: authData, error: authError } = await _supabase.auth.signUp({
+    email,
+    password: pw1,
+    options: {
+      data: {
+        first_name: form.fname.value.trim(),
+        last_name:  form.lname.value.trim(),
+      }
+    }
+  });
+
+  if (authError) {
+    showAlert(authError.message);
+    btn.disabled = false;
+    btn.textContent = 'Create Account';
+    return;
+  }
+
+  const userId = authData.user?.id;
+
+  // ── 2. Insert profile row ────────────────────────────────────────────
+  if (userId) {
+    const { error: profileError } = await _supabase.from('profiles').insert({
+      id:             userId,
+      first_name:     form.fname.value.trim(),
+      last_name:      form.lname.value.trim(),
+      middle_name:    form.mname?.value?.trim() || null,
+      sex:            form.sex.value || null,
+      birthdate:      bdate,
+      contact:        form.contact?.value?.trim() || null,
+      street_address: form.street?.value?.trim() || null,
+      province:       document.getElementById('sel-prov').options[document.getElementById('sel-prov').selectedIndex]?.text || null,
+      city:           document.getElementById('sel-city').options[document.getElementById('sel-city').selectedIndex]?.text || null,
+      barangay:       document.getElementById('sel-brgy').options[document.getElementById('sel-brgy').selectedIndex]?.text || null,
+    });
+
+    if (profileError) {
+      // Auth user was created but profile failed — log and continue
+      console.warn('Profile insert warning:', profileError.message);
+    }
+  }
+
+  // ── 3. Done — do NOT log the user in yet. Show the "verify email" view
+  //     instead of redirecting to the dashboard. The account only becomes
+  //     usable once the confirmation link is clicked.
+  _pendingEmail = email;
+  document.getElementById('reg-form-wrap').style.display = 'none';
+  document.getElementById('verify-email-text').textContent = email;
+  document.getElementById('verify-view').style.display = 'block';
+}
+
+// ── RESEND CONFIRMATION EMAIL ────────────────────────────────────────
+let _pendingEmail = '';
+async function resendVerification() {
+  if (!_pendingEmail) return;
+  const btn = document.getElementById('resend-btn');
+  const alertBox = document.getElementById('verify-alert');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  const { error } = await _supabase.auth.resend({
+    type: 'signup',
+    email: _pendingEmail
+  });
+
+  alertBox.style.display = 'block';
+  if (error) {
+    alertBox.style.cssText += 'background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;';
+    alertBox.textContent = error.message;
+  } else {
+    alertBox.style.cssText += 'background:#f0fdf4;border:1px solid #86efac;color:#166534;';
+    alertBox.textContent = 'Confirmation email sent! Please check your inbox (and spam folder).';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Resend confirmation email';
+}
+
+// ── Terms of Service / Privacy Policy modal ─────────────────────────
+let _legalReturnFocus = null;
+function openLegal(which) {
+  which = which === 'privacy' ? 'privacy' : 'terms';
+  const modal = document.getElementById('legal-modal');
+  if (!modal.classList.contains('show')) _legalReturnFocus = document.activeElement;
+  document.getElementById('legal-title').textContent = which === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
+  ['terms', 'privacy'].forEach(k => {
+    document.getElementById('legal-body-' + k).style.display = (k === which) ? '' : 'none';
+    document.getElementById('legal-tab-' + k).classList.toggle('active', k === which);
+  });
+  document.getElementById('legal-body-' + which).scrollTop = 0;
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  modal.querySelector('.legal-close').focus();
+}
+function closeLegal() {
+  document.getElementById('legal-modal').classList.remove('show');
+  document.body.style.overflow = '';
+  if (_legalReturnFocus && _legalReturnFocus.focus) _legalReturnFocus.focus();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('legal-modal').classList.contains('show')) closeLegal(); });
+// "I agree" ticks the registration checkbox and closes the window
+function agreeLegal() {
+  const cb = document.getElementById('terms');
+  if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+  closeLegal();
+}
+
+// ── ALERT HELPER ──────────────────────────────────────────────────────
+function showAlert(msg, type='error') {
+  // Reuse error styling; add a success style if needed
+  const existing = document.getElementById('reg-alert');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'reg-alert';
+  const colors = type==='success'
+    ? 'background:#f0fdf4;border:1px solid #86efac;color:#166534;'
+    : 'background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;';
+  div.style.cssText = `${colors}padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;`;
+  div.textContent = msg;
+  const form = document.getElementById('regForm');
+  form.insertAdjacentElement('beforebegin', div);
+  div.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+</script>
+</body>
+</html>
