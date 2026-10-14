@@ -128,6 +128,17 @@ app.use((req, res, next) => {
 });
 
 // ── Clean page routes (hide .html extensions from the address bar) ────
+// Vercel's Express function excludes ordinary static HTML unless it is
+// explicitly referenced during bundling. Use fixed file references so that
+// the pages are included in the function, while public/ serves CDN assets.
+const VERCEL_PAGES = process.env.VERCEL ? {
+  'index.html': require('fs').readFileSync(path.join(__dirname, 'index.html'), 'utf8'),
+  'signin.html': require('fs').readFileSync(path.join(__dirname, 'signin.html'), 'utf8'),
+  'Register.html': require('fs').readFileSync(path.join(__dirname, 'Register.html'), 'utf8'),
+  'Forgotpassword.html': require('fs').readFileSync(path.join(__dirname, 'Forgotpassword.html'), 'utf8'),
+  'all-tab.html': require('fs').readFileSync(path.join(__dirname, 'all-tab.html'), 'utf8'),
+} : null;
+
 const PAGE_ROUTES = {
   '/':               'index.html',
   '/signin':         'signin.html',
@@ -136,7 +147,7 @@ const PAGE_ROUTES = {
   '/dashboard':      'all-tab.html',
 };
 for (const [route, file] of Object.entries(PAGE_ROUTES)) {
-  app.get(route, (req, res) => res.sendFile(path.join(__dirname, file)));
+  app.get(route, (req, res) => VERCEL_PAGES ? res.type('html').send(VERCEL_PAGES[file]) : res.sendFile(path.join(__dirname, file)));
 }
 
 // ── Redirect direct .html hits back to their clean URL ──────────────────
