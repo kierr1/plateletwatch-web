@@ -151,6 +151,23 @@ for (const [route, file] of Object.entries(PAGE_ROUTES)) {
 }
 
 // ── Redirect direct .html hits back to their clean URL ──────────────────
+// On Vercel, rewrites target these .html URLs directly. Serve the bundled
+// pages instead of redirecting them back to clean URLs.
+if (VERCEL_PAGES) {
+  const VERCEL_HTML_ROUTES = {
+    '/index.html': 'index.html',
+    '/signin.html': 'signin.html',
+    '/Register.html': 'Register.html',
+    '/register.html': 'Register.html',
+    '/Forgotpassword.html': 'Forgotpassword.html',
+    '/forgotpassword.html': 'Forgotpassword.html',
+    '/all-tab.html': 'all-tab.html',
+  };
+  for (const [url, file] of Object.entries(VERCEL_HTML_ROUTES)) {
+    app.get(url, (req, res) => res.type('html').send(VERCEL_PAGES[file]));
+  }
+}
+
 const HTML_REDIRECTS = {
   '/index.html':          '/',
   '/signin.html':         '/signin',
