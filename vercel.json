@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "express",
+  "buildCommand": "mkdir -p public && cp ./*.html ./*.css ./supabase.config.js public/ && cp -R ./pics public/",
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/signin", "destination": "/signin.html" },
+    { "source": "/register", "destination": "/Register.html" },
+    { "source": "/forgotpassword", "destination": "/Forgotpassword.html" },
+    { "source": "/dashboard", "destination": "/all-tab.html" }
+  ]
+}
