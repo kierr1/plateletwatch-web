@@ -3665,6 +3665,17 @@ function onBboxHideAllToggle(checked) {
   drawDetectionBoxes(_lastDetections);
 }
 
+// Platelet label with model confidence, e.g. "P3 87%". Colour-rescued candidates have no real
+// model probability, so they get "P3 cand." instead of a misleading percentage.
+function plateletLabel(det, idx) {
+  if (det && (det.source === 'color_rescue' || det.confidence_kind === 'heuristic_candidate')) return `P${idx} cand.`;
+  let pct = null;
+  if (det && typeof det.confidence_percent === 'number') pct = det.confidence_percent;
+  else if (det && typeof det.confidence === 'number')    pct = det.confidence * 100;
+  else if (det && typeof det.score === 'number')         pct = det.score * 100;
+  return pct === null ? `P${idx}` : `P${idx} ${Math.round(pct)}%`;
+}
+
 function drawDetectionBoxes(detections) {
   if (detections && detections.length) _lastDetections = detections;
   const previewImg = document.getElementById('preview-img');
@@ -3738,7 +3749,7 @@ function drawDetectionBoxes(detections) {
     // Label (only for platelets to avoid clutter)
     if (det.class_name === 'Platelet') {
       plateletIdx++;
-      const label = `P${plateletIdx}`;
+      const label = plateletLabel(det, plateletIdx);
       ctx.font = 'bold 10px Inter, sans-serif';
       const tw = ctx.measureText(label).width + 6;
       ctx.fillStyle = color;
@@ -4007,7 +4018,7 @@ function _buildFieldThumb(detections) {
           if (d.class_name === 'Platelet') {
             n++;
             ctx.font = 'bold 11px Inter, sans-serif';
-            const label = 'P' + n, tw = ctx.measureText(label).width + 6;
+            const label = plateletLabel(d, n), tw = ctx.measureText(label).width + 6;
             ctx.fillStyle = colors.Platelet; ctx.fillRect(x1 * k, y1 * k - 15, tw, 15);
             ctx.fillStyle = '#0a0d14'; ctx.fillText(label, x1 * k + 3, y1 * k - 4);
           }
@@ -4035,7 +4046,7 @@ async function autoRecordCurrentField(detections) {
   const thumb = await _buildFieldThumb(detections);
   if (!_fieldSessionActive) return;
   const entry = { platelets, rbc, wbc, thumb, fileRef, source: _captureSource === 'rpi' ? 'Pi camera' : 'Upload',
-    detections: (detections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n)), class_name: d.class_name })) };
+    detections: (detections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n)), class_name: d.class_name, confidence: (typeof d.confidence === 'number') ? Math.round(d.confidence * 1000) / 1000 : undefined, source: d.source })) };
   if (existing !== -1) _fieldData[existing] = entry; else _fieldData.push(entry);
   renderFieldLog();
   updateFieldSessionUI();
@@ -4284,7 +4295,7 @@ async function saveAnalysisToSupabase() {
   };
   const noteRow  = { clinician_note: extras.note || null };
   const extraRow = { patient_name: extras.patient || null, ns1_antigen: extras.ns1 || null, dengue_igm: extras.igm || null, dengue_igg: extras.igg || null };
-  const detCompact = (_lastDetections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n * singleScale)), class_name: d.class_name }));
+  const detCompact = (_lastDetections || []).filter(d => d && Array.isArray(d.bbox)).map(d => ({ bbox: d.bbox.map(n => Math.round(n * singleScale)), class_name: d.class_name, confidence: (typeof d.confidence === 'number') ? Math.round(d.confidence * 1000) / 1000 : undefined, source: d.source }));
   const detRow = { detections: (detCompact.length && !fieldImages) ? detCompact : null };
   // Insert the full row; if the table lacks a newer column, drop just that column and retry so the count is never lost.
   const payload = { ...baseRow, ...extraRow, ...noteRow, ...detRow };
@@ -4700,7 +4711,7 @@ async function exportAnnotatedImage() {
             ctx.strokeRect(x1, y1, bw, bh);
             if (det.class_name === 'Platelet') {
               platIdx++;
-              const label = `P${platIdx}`;
+              const label = plateletLabel(det, platIdx);
               const fs = Math.max(10, Math.round(W * 0.012));
               ctx.font = `bold ${fs}px Arial`;
               const tw = ctx.measureText(label).width + 6;
