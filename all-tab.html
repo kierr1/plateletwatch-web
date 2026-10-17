@@ -1902,6 +1902,7 @@ body{background-image:none;}
       <button class="crop-modal-close" onclick="cancelCropModal()" aria-label="Close">✕</button>
     </div>
     <div class="crop-modal-note">Drag a box around the blood smear field you want analyzed. Cropping out empty edges, glare, or slide borders improves detection accuracy.</div>
+    <div class="crop-modal-note" id="crop-auto-status" aria-live="polite" style="padding-top:4px;color:#22D3EE;min-height:20px;"></div>
     <div class="crop-viewport">
       <div class="crop-stage" id="crop-stage">
         <img id="crop-stage-img" src="" alt="Photo to crop" draggable="false">
@@ -1914,7 +1915,10 @@ body{background-image:none;}
       </div>
     </div>
     <div class="crop-modal-controls">
-      <button class="btn-outline" onclick="resetCropSelection()" style="padding:9px 16px;">Reset Selection</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-outline" onclick="autoDetectCropBox(true)" style="padding:9px 16px;" title="Find the round microscope field and select it as a 1:1 square">Auto 1:1</button>
+        <button class="btn-outline" onclick="resetCropSelection()" style="padding:9px 16px;">Reset Selection</button>
+      </div>
       <div class="crop-actions">
         <button class="btn-outline" onclick="skipCropModal()" style="padding:9px 16px;">Use Without Cropping</button>
         <button class="btn-primary-sm" onclick="applyCropModal()" id="crop-apply-btn" style="padding:9px 18px;">
@@ -2926,10 +2930,55 @@ function openCropModal(dataURL) {
   const modal = document.getElementById('crop-modal');
   const img = document.getElementById('crop-stage-img');
   _cropBox = null;
+  _cropTouched = false;
   document.getElementById('crop-selection').style.display = 'none';
-  img.onload = function() { _initCropHandlers(); };
+  const st = document.getElementById('crop-auto-status'); if (st) st.textContent = '';
+  img.onload = function() { _initCropHandlers(); autoDetectCropBox(false); };
   img.src = dataURL;
   modal.classList.add('open');
+}
+
+// Ask the inference server to find the round microscope field and pre-fill a 1:1 crop box.
+// Runs automatically when the crop step opens (unless the user has already started drawing) and
+// again whenever "Auto 1:1" is pressed. If the server is unreachable or no round field is found,
+// the manual drag-to-crop behaviour is unchanged.
+let _cropTouched = false;     // true once the user draws/moves/resizes a box themselves
+let _cropAutoToken = 0;       // lets a newer photo or click supersede a slow response
+async function autoDetectCropBox(userClicked) {
+  const img = document.getElementById('crop-stage-img');
+  const status = document.getElementById('crop-auto-status');
+  const say = (t) => { if (status) status.textContent = t; };
+  if (!img || !img.naturalWidth) return;
+  const token = ++_cropAutoToken;
+  say('Looking for the round microscope field…');
+  try {
+    // Send a small copy: the server only needs the shape of the field, and coordinates come back in its pixels.
+    const k = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k));
+    c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const res = await fetch('/api/detect-field', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.85).split(',')[1] })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (token !== _cropAutoToken) return;                   // superseded by a newer photo / click
+    if (!userClicked && _cropTouched) { say(''); return; }  // don't overwrite a box the user is already drawing
+    if (d.field_shape !== 'round') { say('No round field found — drag a box around the area you want analyzed.'); return; }
+    const [x1, y1, x2, y2] = d.crop_box;
+    const stage = _stageEl();
+    // offsetWidth/Height ignore the modal's open animation (getBoundingClientRect would not).
+    const sx = stage.offsetWidth / c.width, sy = stage.offsetHeight / c.height;
+    _cropBox = { x: x1 * sx, y: y1 * sy, w: (x2 - x1) * sx, h: (y2 - y1) * sy };
+    _renderCropBox();
+    const side = Math.round((x2 - x1) / k);
+    say('Round field found — selected a ' + side + '×' + side + ' px square. Adjust it if needed, then press Crop & Continue.');
+  } catch (e) {
+    if (token === _cropAutoToken) say('Auto-detect unavailable — drag a box around the area you want analyzed.');
+  }
 }
 
 function _stageEl() { return document.getElementById('crop-stage'); }
@@ -2958,6 +3007,7 @@ function _cropPointerDown(e) {
   const handleEl = e.target.closest && e.target.closest('.crop-handle');
   const selEl = _selEl();
   const p = _cropPoint(e);
+  _cropTouched = true;
   if (handleEl) {
     _cropDrag = { mode: 'resize', handle: handleEl.dataset.handle, startX: p.x, startY: p.y, startBox: Object.assign({}, _cropBox) };
   } else if (e.target === selEl && _cropBox) {
