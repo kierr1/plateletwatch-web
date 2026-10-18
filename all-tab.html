@@ -3748,7 +3748,7 @@ function plateletLabel(det, idx) {
 }
 
 function drawDetectionBoxes(detections) {
-  if (detections && detections.length) _lastDetections = detections;
+  _lastDetections = Array.isArray(detections) ? detections : [];
   const previewImg = document.getElementById('preview-img');
   if (!previewImg) return;
 
