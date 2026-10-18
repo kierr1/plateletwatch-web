@@ -1452,6 +1452,9 @@ body{background-image:none;}
             <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#d99a06;cursor:pointer;white-space:nowrap;">
               <input type="checkbox" id="bbox-show-wbc" checked onchange="onBboxClassToggle('WBC',this.checked)" style="cursor:pointer;accent-color:#fbbf24;"> WBC
             </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--text-mid);cursor:pointer;white-space:nowrap;" title="Show or hide the P1, P2… tags and confidence % on each platelet box (boxes stay)">
+              <input type="checkbox" id="bbox-show-labels" checked onchange="onBboxLabelsToggle(this.checked)" style="cursor:pointer;accent-color:#22D3EE;"> P-labels &amp; confidence
+            </label>
             <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer;white-space:nowrap;margin-left:auto;">
               <input type="checkbox" id="bbox-hide-all" onchange="onBboxHideAllToggle(this.checked)" style="cursor:pointer;"> Hide all boxes
             </label>
@@ -3711,6 +3714,7 @@ function displayAnalysisResult(platelets, rbc, wbc, estPerUl, severity, note, zo
 let _lastDetections = [];
 let _bboxOpacity = 1;    // 0–1, opacity of drawn boxes, fills and labels
 let _bboxHideAll = false; // manual "hide all boxes" override
+let _bboxShowLabels = true; // show "P1 87%" tags on platelet boxes (boxes stay when off)
 const _bboxClassVisible = { Platelet: true, RBC: true, WBC: true }; // per-class show/hide
 
 function onBboxOpacityChange(sliderVal) {
@@ -3725,10 +3729,17 @@ function onBboxClassToggle(cls, checked) {
   drawDetectionBoxes(_lastDetections);
 }
 
+function onBboxLabelsToggle(checked) {
+  _bboxShowLabels = !!checked;
+  drawDetectionBoxes(_lastDetections);
+}
+
 function onBboxHideAllToggle(checked) {
   _bboxHideAll = !!checked;
   const slider = document.getElementById('bbox-opacity-slider');
   if (slider) slider.disabled = _bboxHideAll;
+  const lblCb = document.getElementById('bbox-show-labels');
+  if (lblCb) lblCb.disabled = _bboxHideAll;
   ['platelet','rbc','wbc'].forEach(k => {
     const cb = document.getElementById('bbox-show-' + k);
     if (cb) cb.disabled = _bboxHideAll;
@@ -3815,13 +3826,15 @@ function drawDetectionBoxes(detections) {
     // Label (only for platelets to avoid clutter)
     if (det.class_name === 'Platelet') {
       plateletIdx++;
-      const label = plateletLabel(det, plateletIdx);
-      ctx.font = 'bold 10px Inter, sans-serif';
-      const tw = ctx.measureText(label).width + 6;
-      ctx.fillStyle = color;
-      ctx.fillRect(sx1, sy1 - 16, tw, 16);
-      ctx.fillStyle = '#0a0d14';
-      ctx.fillText(label, sx1 + 3, sy1 - 4);
+      if (_bboxShowLabels) {
+        const label = plateletLabel(det, plateletIdx);
+        ctx.font = 'bold 10px Inter, sans-serif';
+        const tw = ctx.measureText(label).width + 6;
+        ctx.fillStyle = color;
+        ctx.fillRect(sx1, sy1 - 16, tw, 16);
+        ctx.fillStyle = '#0a0d14';
+        ctx.fillText(label, sx1 + 3, sy1 - 4);
+      }
     }
   });
 
@@ -4084,10 +4097,12 @@ function _buildFieldThumb(detections) {
           ctx.strokeRect(x1 * k, y1 * k, (x2 - x1) * k, (y2 - y1) * k);
           if (d.class_name === 'Platelet') {
             n++;
-            ctx.font = 'bold 11px Inter, sans-serif';
-            const label = plateletLabel(d, n), tw = ctx.measureText(label).width + 6;
-            ctx.fillStyle = colors.Platelet; ctx.fillRect(x1 * k, y1 * k - 15, tw, 15);
-            ctx.fillStyle = '#0a0d14'; ctx.fillText(label, x1 * k + 3, y1 * k - 4);
+            if (_bboxShowLabels) {
+              ctx.font = 'bold 11px Inter, sans-serif';
+              const label = plateletLabel(d, n), tw = ctx.measureText(label).width + 6;
+              ctx.fillStyle = colors.Platelet; ctx.fillRect(x1 * k, y1 * k - 15, tw, 15);
+              ctx.fillStyle = '#0a0d14'; ctx.fillText(label, x1 * k + 3, y1 * k - 4);
+            }
           }
         });
         ctx.globalAlpha = 1;
@@ -4779,16 +4794,18 @@ async function exportAnnotatedImage() {
             ctx.strokeRect(x1, y1, bw, bh);
             if (det.class_name === 'Platelet') {
               platIdx++;
-              const label = plateletLabel(det, platIdx);
-              const fs = Math.max(10, Math.round(W * 0.012));
-              ctx.font = `bold ${fs}px Arial`;
-              const tw = ctx.measureText(label).width + 6;
-              const lh = fs + 6;
-              ctx.fillStyle = color;
-              ctx.fillRect(x1, y1 - lh, tw, lh);
-              ctx.fillStyle = '#0a0d14';
-              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-              ctx.fillText(label, x1 + 3, y1 - lh / 2);
+              if (_bboxShowLabels) {
+                const label = plateletLabel(det, platIdx);
+                const fs = Math.max(10, Math.round(W * 0.012));
+                ctx.font = `bold ${fs}px Arial`;
+                const tw = ctx.measureText(label).width + 6;
+                const lh = fs + 6;
+                ctx.fillStyle = color;
+                ctx.fillRect(x1, y1 - lh, tw, lh);
+                ctx.fillStyle = '#0a0d14';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText(label, x1 + 3, y1 - lh / 2);
+              }
             }
           });
           // Legend top-right
