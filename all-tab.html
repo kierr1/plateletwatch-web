@@ -1280,6 +1280,14 @@ body{background-image:none;}
               Risk Assessment
             </div>
 
+            <!-- Patient picker: choose whose result is shown on the dashboard -->
+            <div style="margin-bottom:16px;">
+              <label class="field-label" for="dash-patient-select" style="display:block;margin-bottom:6px;">Patient</label>
+              <select class="field-input" id="dash-patient-select" onchange="onDashPatientChange()" style="width:100%;box-sizing:border-box;cursor:pointer;">
+                <option value="auto">Latest result</option>
+              </select>
+            </div>
+
             <div class="risk-card">
               <div>
                 <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
@@ -1303,6 +1311,9 @@ body{background-image:none;}
                   <p id="dash-reco-text">Within normal limits — continue routine monitoring. Not a medical diagnosis.</p>
                 </div>
               </div>
+
+              <!-- Selected patient's record details -->
+              <div id="dash-patient-detail" style="display:none;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--surface-2);"></div>
             </div>
           </aside>
         </div>
@@ -4999,16 +5010,88 @@ function dotColor(v) {
   return '#16a34a';
 }
 
-function updateDashboardStats() {
-  // Pull from currentAnalysisResult if available, otherwise latest history row
+// ── Dashboard patient picker ──────────────────────────────────────────
+var _dashSelKey = 'auto'; // 'auto' = latest result, 'current' = unsaved analysis on screen, otherwise a saved record key
+
+function populateDashPatients() {
+  const sel = document.getElementById('dash-patient-select');
+  if (!sel) return;
+  ALL_HISTORY_ROWS.forEach(r => { if (!r._k) r._k = r.id ? String(r.id) : 'tmp' + Math.random().toString(36).slice(2); });
+  const hasCurrent = !!currentAnalysisResult;
+  if (_dashSelKey === 'current' && !hasCurrent) _dashSelKey = 'auto';
+  if (_dashSelKey !== 'auto' && _dashSelKey !== 'current' && !ALL_HISTORY_ROWS.some(r => r._k === _dashSelKey)) _dashSelKey = 'auto';
+  const opts = ['<option value="auto">Latest result</option>'];
+  if (hasCurrent) {
+    const nm = (document.getElementById('patient-name-input')?.value || '').trim();
+    opts.push(`<option value="current">${_hEsc(nm || 'Current analysis')} — not saved yet</option>`);
+  }
+  ALL_HISTORY_ROWS.forEach(r => {
+    opts.push(`<option value="${_hEsc(r._k)}">${_hEsc(`${r.patient || 'No patient name'} — ${formatHistoryDate(r.date)} ${r.time} — ${r.count} /µL`)}</option>`);
+  });
+  sel.innerHTML = opts.join('');
+  sel.value = _dashSelKey;
+}
+function onDashPatientChange() {
+  _dashSelKey = document.getElementById('dash-patient-select').value || 'auto';
+  updateDashboardStats();
+}
+// Resolves which result the dashboard should display.
+function getDashSource() {
   const res = currentAnalysisResult;
-  const latestRow = ALL_HISTORY_ROWS[0];
+  const rowToSrc = r => ({
+    est: (r.est != null ? Number(r.est) : parseInt(String(r.count).replace(/,/g, ''))) || 0,
+    severity: (r.level || 'normal').toUpperCase(),
+    plt: r.plt, rbc: r.rbc, wbc: r.wbc, row: r
+  });
+  const curSrc = () => ({ est: res.estPerUl, severity: res.severity, plt: res.platelets, rbc: res.rbc, wbc: res.wbc, row: null, isCurrent: true });
+  if (_dashSelKey === 'current' && res) return curSrc();
+  if (_dashSelKey !== 'auto' && _dashSelKey !== 'current') {
+    const r = ALL_HISTORY_ROWS.find(x => x._k === _dashSelKey);
+    if (r) return rowToSrc(r);
+  }
+  if (res) return curSrc();
+  return ALL_HISTORY_ROWS[0] ? rowToSrc(ALL_HISTORY_ROWS[0]) : null;
+}
+function renderDashPatientDetail(src) {
+  const box = document.getElementById('dash-patient-detail');
+  if (!box) return;
+  if (!src) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  let name, when, ns1, igm, igg, note;
+  if (src.row) {
+    const r = src.row;
+    name = r.patient || 'No patient name'; when = formatHistoryDate(r.date) + ' · ' + r.time;
+    ns1 = r.ns1; igm = r.igm; igg = r.igg; note = r.note;
+  } else {
+    const ex = getClinicalExtras();
+    name = ex.patient || 'Current analysis'; when = 'Not saved yet';
+    ns1 = ex.ns1; igm = ex.igm; igg = ex.igg; note = ex.note;
+  }
+  const tile = (l, v) => `<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;"><div style="font-size:9.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">${l}</div><div style="font-size:13px;font-weight:700;color:var(--text-dark);margin-top:2px;overflow-wrap:anywhere;${v ? '' : 'font-weight:500;color:var(--mid-gray);'}">${v ? _hEsc(v) : '—'}</div></div>`;
+  const num = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString();
+  box.innerHTML = `
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text-dark);overflow-wrap:anywhere;">${_hEsc(name)}</div>
+      <div style="font-size:11px;color:var(--text-muted);">${_hEsc(when)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px;">
+      ${tile('Platelets', num(src.plt))}${tile('RBC', num(src.rbc))}${tile('WBC', num(src.wbc))}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+      ${tile('NS1', ns1)}${tile('IgM', igm)}${tile('IgG', igg)}
+    </div>
+    ${note ? `<div style="margin-top:8px;background:#fff8e7;border:1px solid #f5c842;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.55;color:#4a3300;white-space:pre-wrap;overflow-wrap:anywhere;">${_hEsc(note)}</div>` : ''}`;
+  box.style.display = 'block';
+}
 
-  // ── Stats row below camera (removed along with microscope feed section) ──
+function updateDashboardStats() {
+  try { populateDashPatients(); } catch (e) { console.warn('Dashboard patient list error', e); }
+  // Show the patient chosen in the dashboard dropdown (defaults to the latest result)
+  const src = getDashSource();
+  renderDashPatientDetail(src);
 
-  // ── My Latest Count box ──────────────────────────────────────────────
-  const estVal = res ? res.estPerUl : (latestRow ? parseInt(latestRow.count.replace(/,/g,'')) : null);
-  const severity = res ? res.severity : (latestRow ? latestRow.level?.toUpperCase() : null);
+  // ── Count box ────────────────────────────────────────────────────────
+  const estVal = src ? src.est : null;
+  const severity = src ? src.severity : null;
   const countValEl    = document.getElementById('latest-count-val');
   const countLabelEl  = document.getElementById('latest-count-label');
   const countBoxEl    = document.getElementById('latest-count-box');
@@ -5053,12 +5136,10 @@ function updateDashboardStats() {
     if (mPlt) mPlt.textContent = estVal.toLocaleString();
     const mPltTrend = document.getElementById('metric-plt-trend');
     if (mPltTrend){ mPltTrend.className = 'metric-trend ' + (severity==='NORMAL'||severity==='HIGH'?'up':'down'); mPltTrend.textContent = (severity==='NORMAL'?'▲ Stable':'▼ '+bd.txt); }
-    if (res){
-      const mCells = document.getElementById('metric-cells-val');
-      if (mCells) mCells.textContent = ((res.platelets||0)+(res.rbc||0)+(res.wbc||0)).toLocaleString();
-    } else {
-      const mCells = document.getElementById('metric-cells-val');
-      if (mCells) mCells.textContent = '—';
+    const mCells = document.getElementById('metric-cells-val');
+    if (mCells) {
+      const hasCells = src && (src.plt != null || src.rbc != null || src.wbc != null);
+      mCells.textContent = hasCells ? ((Number(src.plt)||0)+(Number(src.rbc)||0)+(Number(src.wbc)||0)).toLocaleString() : '—';
     }
   } else {
     countValEl.textContent       = '—';
