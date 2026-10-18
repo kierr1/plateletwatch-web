@@ -2938,263 +2938,47 @@ function openCropModal(dataURL) {
   modal.classList.add('open');
 }
 
-// ── Round-field detection (runs in the browser; no server round-trip) ────────────────────────
-// Port of detect_round_field() / square_crop_for_circle() from inference_server.py.
-// Finds the circular lit field of an eyepiece / USB-microscope photo, even when the circle is cut
-// off by the image edge, and proposes a 1:1 crop box. Returns {found, reason, cx, cy, r, box:[l,t,r,b]}
-// in the pixel space of the RGBA buffer it is given.
-const FIELD_CFG = { fitTol: 0.03, minIoU: 0.90, minRadiusFrac: 0.18, margin: 0.02 };
-
-function _fdBoxBlur(src, w, h, rad) {
-  // two-pass separable box blur on a Uint8 plane (edge-clamped)
-  const tmp = new Float32Array(w * h), out = new Uint8Array(w * h), n = 2 * rad + 1;
-  for (let y = 0; y < h; y++) {
-    let acc = 0;
-    for (let i = -rad; i <= rad; i++) acc += src[y * w + Math.min(w - 1, Math.max(0, i))];
-    for (let x = 0; x < w; x++) {
-      tmp[y * w + x] = acc / n;
-      acc += src[y * w + Math.min(w - 1, x + rad + 1)] - src[y * w + Math.max(0, x - rad)];
-    }
-  }
-  for (let x = 0; x < w; x++) {
-    let acc = 0;
-    for (let i = -rad; i <= rad; i++) acc += tmp[Math.min(h - 1, Math.max(0, i)) * w + x];
-    for (let y = 0; y < h; y++) {
-      out[y * w + x] = Math.round(acc / n);
-      acc += tmp[Math.min(h - 1, y + rad + 1) * w + x] - tmp[Math.max(0, y - rad) * w + x];
-    }
-  }
-  return out;
-}
-
-function _fdOtsu(gray) {
-  const hist = new Float64Array(256);
-  for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
-  const total = gray.length;
-  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
-  let sumB = 0, wB = 0, best = -1, thr = 0;
-  for (let t = 0; t < 256; t++) {
-    wB += hist[t]; if (!wB) continue;
-    const wF = total - wB; if (!wF) break;
-    sumB += t * hist[t];
-    const mB = sumB / wB, mF = (sum - sumB) / wF;
-    const v = wB * wF * (mB - mF) * (mB - mF);
-    if (v > best) { best = v; thr = t; }
-  }
-  return thr + 1;   // pixels >= thr+1 are "bright" (matches cv2 THRESH_BINARY semantics closely)
-}
-
-function _fdDilate(m, w, h, rad) {
-  // binary dilation with a disk of radius `rad`; pixels outside the image count as 0
-  const out = new Uint8Array(w * h), cache = {};
-  const horiz = (hw) => {
-    if (cache[hw]) return cache[hw];
-    const o = new Uint8Array(w * h), pre = new Int32Array(w + 1);
-    for (let y = 0; y < h; y++) {
-      pre[0] = 0;
-      for (let x = 0; x < w; x++) pre[x + 1] = pre[x] + m[y * w + x];
-      for (let x = 0; x < w; x++) o[y * w + x] = (pre[Math.min(w, x + hw + 1)] - pre[Math.max(0, x - hw)]) > 0 ? 1 : 0;
-    }
-    return (cache[hw] = o);
-  };
-  for (let dy = -rad; dy <= rad; dy++) {
-    const hz = horiz(Math.floor(Math.sqrt(rad * rad - dy * dy)));
-    for (let y = 0; y < h; y++) {
-      const yy = y + dy; if (yy < 0 || yy >= h) continue;
-      const a = y * w, b = yy * w;
-      for (let x = 0; x < w; x++) if (hz[b + x]) out[a + x] = 1;
-    }
-  }
-  return out;
-}
-function _fdErode(m, w, h, rad) {
-  const inv = new Uint8Array(w * h); for (let i = 0; i < inv.length; i++) inv[i] = m[i] ? 0 : 1;
-  const d = _fdDilate(inv, w, h, rad);
-  // outside the image is treated as foreground, so the border never erodes the field
-  for (let i = 0; i < d.length; i++) d[i] = d[i] ? 0 : 1;
-  return d;
-}
-
-function _fdFitCircle(xs, ys) {
-  // least-squares (Kasa) fit, centred for numerical stability. Returns [cx, cy, r] or null
-  const n = xs.length; if (n < 3) return null;
-  let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; } mx /= n; my /= n;
-  let Suu = 0, Suv = 0, Svv = 0, Suuu = 0, Svvv = 0, Suvv = 0, Svuu = 0;
-  for (let i = 0; i < n; i++) {
-    const u = xs[i] - mx, v = ys[i] - my;
-    Suu += u * u; Suv += u * v; Svv += v * v; Suuu += u * u * u; Svvv += v * v * v; Suvv += u * v * v; Svuu += v * u * u;
-  }
-  const det = Suu * Svv - Suv * Suv; if (Math.abs(det) < 1e-9) return null;
-  const b1 = 0.5 * (Suuu + Suvv), b2 = 0.5 * (Svvv + Svuu);
-  const uc = (b1 * Svv - b2 * Suv) / det, vc = (Suu * b2 - Suv * b1) / det;
-  const r2 = uc * uc + vc * vc + (Suu + Svv) / n;
-  if (!isFinite(r2) || r2 <= 0) return null;
-  return [uc + mx, vc + my, Math.sqrt(r2)];
-}
-
-function _fdMedian(a) { const s = Array.from(a).sort((p, q) => p - q); return s.length ? s[s.length >> 1] : 0; }
-
-function detectRoundFieldRGBA(rgba, sw, sh) {
-  const info = { found: false, reason: null };
-  const short = Math.min(sw, sh), N = sw * sh;
-  let gray = new Uint8Array(N);
-  for (let i = 0; i < N; i++) gray[i] = Math.max(rgba[4 * i], rgba[4 * i + 1], rgba[4 * i + 2]);
-  gray = _fdBoxBlur(gray, sw, sh, Math.max(1, Math.round(short / 160)));
-
-  const t = Math.min(110, Math.max(20, _fdOtsu(gray)));
-  const bright = new Uint8Array(N); let nb = 0, sb = 0, sd = 0;
-  for (let i = 0; i < N; i++) { if (gray[i] >= t) { bright[i] = 1; nb++; sb += gray[i]; } else sd += gray[i]; }
-  const frac = nb / N;
-  if (frac > 0.985) { info.reason = 'no dark border around the field'; return info; }
-  if (frac < 0.06) { info.reason = 'lit area too small'; return info; }
-  const brightMean = sb / nb, darkMean = sd / (N - nb);
-  if (brightMean - darkMean < 45 || darkMean > 0.6 * brightMean) { info.reason = 'border not dark enough'; return info; }
-
-  // fuse pale gaps between cells, then drop thin glare / leak protrusions
-  const rc = (Math.max(5, Math.round(short * 0.045)) | 1) >> 1, ro = (Math.max(3, Math.round(short * 0.030)) | 1) >> 1;
-  let mask = _fdErode(_fdDilate(bright, sw, sh, rc), sw, sh, rc);
-  mask = _fdDilate(_fdErode(mask, sw, sh, ro), sw, sh, ro);
-
-  // largest 4-connected component
-  const lab = new Int32Array(N), stack = new Int32Array(N);
-  let bestLab = 0, bestSize = 0, nl = 0;
-  for (let s = 0; s < N; s++) {
-    if (!mask[s] || lab[s]) continue;
-    nl++; let sp = 0, size = 0; stack[sp++] = s; lab[s] = nl;
-    while (sp) {
-      const p = stack[--sp]; size++; const x = p % sw, y = (p / sw) | 0;
-      if (x > 0 && mask[p - 1] && !lab[p - 1]) { lab[p - 1] = nl; stack[sp++] = p - 1; }
-      if (x < sw - 1 && mask[p + 1] && !lab[p + 1]) { lab[p + 1] = nl; stack[sp++] = p + 1; }
-      if (y > 0 && mask[p - sw] && !lab[p - sw]) { lab[p - sw] = nl; stack[sp++] = p - sw; }
-      if (y < sh - 1 && mask[p + sw] && !lab[p + sw]) { lab[p + sw] = nl; stack[sp++] = p + sw; }
-    }
-    if (size > bestSize) { bestSize = size; bestLab = nl; }
-  }
-  if (!bestLab || bestSize < 0.06 * N) { info.reason = 'lit region too small'; return info; }
-
-  // fill holes: anything not reachable from the image border without crossing the component
-  const field = new Uint8Array(N), outside = new Uint8Array(N); let sp = 0;
-  for (let i = 0; i < N; i++) if (lab[i] === bestLab) field[i] = 1;
-  const seed = (p) => { if (!field[p] && !outside[p]) { outside[p] = 1; stack[sp++] = p; } };
-  for (let x = 0; x < sw; x++) { seed(x); seed((sh - 1) * sw + x); }
-  for (let y = 0; y < sh; y++) { seed(y * sw); seed(y * sw + sw - 1); }
-  while (sp) {
-    const p = stack[--sp], x = p % sw, y = (p / sw) | 0;
-    if (x > 0) seed(p - 1); if (x < sw - 1) seed(p + 1); if (y > 0) seed(p - sw); if (y < sh - 1) seed(p + sw);
-  }
-  let fieldArea = 0;
-  for (let i = 0; i < N; i++) { if (!outside[i]) field[i] = 1; fieldArea += field[i]; }
-
-  // outline points that are NOT on the image edge describe the field's true boundary
-  const e = 2, px = [], py = [];
-  for (let y = e + 1; y < sh - 1 - e; y++) for (let x = e + 1; x < sw - 1 - e; x++) {
-    const p = y * sw + x;
-    if (field[p] && (!field[p - 1] || !field[p + 1] || !field[p - sw] || !field[p + sw])) { px.push(x); py.push(y); }
-  }
-  if (px.length < Math.max(40, 0.4 * short)) { info.reason = 'field edge not visible (lit area fills the frame)'; return info; }
-
-  let fit = _fdFitCircle(px, py);
-  if (!fit) { info.reason = 'circle fit failed'; return info; }
-  let [cx, cy, r] = fit;
-  const dist = (i) => Math.abs(Math.hypot(px[i] - cx, py[i] - cy) - r);
-  for (let it = 0; it < 3; it++) {            // re-fit without outliers (glare, a finger, a notch)
-    const d = px.map((_, i) => dist(i));
-    const tol = Math.max(2.5 * 1.4826 * _fdMedian(d), 0.015 * r, 1.0);
-    const ix = [], iy = [];
-    for (let i = 0; i < d.length; i++) if (d[i] <= tol) { ix.push(px[i]); iy.push(py[i]); }
-    if (ix.length < 20) break;
-    const nf = _fdFitCircle(ix, iy); if (!nf) break;
-    [cx, cy, r] = nf;
-  }
-
-  const tolIn = Math.max(FIELD_CFG.fitTol * r, 1.5);
-  let inl = 0, sq = 0; const bins = new Set();
-  for (let i = 0; i < px.length; i++) {
-    const d = dist(i);
-    if (d <= tolIn) {
-      inl++; sq += d * d;
-      bins.add(Math.floor(((Math.atan2(py[i] - cy, px[i] - cx) + Math.PI) / (2 * Math.PI)) * 72) % 72);
-    }
-  }
-  const inlierFrac = inl / px.length, coverage = bins.size * 5;
-  let inter = 0, uni = 0; const r2 = r * r;
-  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
-    const f = field[y * sw + x], dsc = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) <= r2 ? 1 : 0;
-    if (f && dsc) inter++; if (f || dsc) uni++;
-  }
-  const iou = uni ? inter / uni : 0;
-  Object.assign(info, { fit_inlier_fraction: +inlierFrac.toFixed(3), arc_coverage_deg: coverage, field_iou: +iou.toFixed(3), threshold: t });
-
-  if (r < FIELD_CFG.minRadiusFrac * short || r > 2.0 * Math.max(sw, sh)) info.reason = 'fitted circle has an implausible size';
-  else if (coverage < 90) info.reason = 'too little of the field edge is visible to trust a circle';
-  else if (inlierFrac < 0.80 || iou < FIELD_CFG.minIoU) info.reason = 'lit region is not circular';
-  else Object.assign(info, { found: true, reason: null, cx, cy, r });
-  return info;
-}
-
-// 1:1 box around the circle (clamped to stay inside the image), in the buffer's pixel space
-function squareBoxForCircle(cx, cy, r, W, H) {
-  let side = 2 * r * (1 + 2 * FIELD_CFG.margin);
-  side = Math.round(Math.max(32, Math.min(side, W, H)));
-  const left = Math.round(Math.max(0, Math.min(W - side, cx - side / 2)));
-  const top = Math.round(Math.max(0, Math.min(H - side, cy - side / 2)));
-  return [left, top, left + side, top + side];
-}
-
-// Browser wrapper: downscale an <img> and run the detector. Result is in the image's NATURAL pixels.
-function detectRoundFieldFromImage(img) {
-  const W = img.naturalWidth, H = img.naturalHeight;
-  if (Math.min(W, H) < 96) return { found: false, reason: 'image too small' };
-  const k = Math.min(1, 320 / Math.max(W, H));
-  const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, c.width, c.height);
-  const info = detectRoundFieldRGBA(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-  if (info.found) {
-    info.cx /= k; info.cy /= k; info.r /= k;
-    info.box = squareBoxForCircle(info.cx, info.cy, info.r, W, H);
-  }
-  return info;
-}
-
-// Find the round microscope field and pre-fill a 1:1 crop box. Runs automatically when the crop step
-// opens (unless the user has already started drawing) and again whenever "Auto 1:1" is pressed.
-// Detection happens entirely in the browser, so it does not depend on any server route.
-// If no round field is found, the manual drag-to-crop behaviour is unchanged.
+// Ask the inference server to find the round microscope field and pre-fill a 1:1 crop box.
+// Runs automatically when the crop step opens (unless the user has already started drawing) and
+// again whenever "Auto 1:1" is pressed. If the server is unreachable or no round field is found,
+// the manual drag-to-crop behaviour is unchanged.
 let _cropTouched = false;     // true once the user draws/moves/resizes a box themselves
-let _cropAutoToken = 0;       // lets a newer photo or click supersede an earlier run
-function autoDetectCropBox(userClicked) {
+let _cropAutoToken = 0;       // lets a newer photo or click supersede a slow response
+async function autoDetectCropBox(userClicked) {
   const img = document.getElementById('crop-stage-img');
   const status = document.getElementById('crop-auto-status');
   const say = (t) => { if (status) status.textContent = t; };
   if (!img || !img.naturalWidth) return;
   const token = ++_cropAutoToken;
   say('Looking for the round microscope field…');
-  // let the status text paint before the (≈100-300 ms) analysis runs
-  setTimeout(() => {
-    if (token !== _cropAutoToken) return;
-    try {
-      const d = detectRoundFieldFromImage(img);
-      if (!userClicked && _cropTouched) { say(''); return; }   // don't overwrite a box the user is already drawing
-      if (!d.found) {
-        console.info('[auto-crop] no round field:', d.reason, d);
-        say('No round field found — drag a box around the area you want analyzed.');
-        return;
-      }
-      const [x1, y1, x2, y2] = d.box;
-      const stage = _stageEl();
-      // offsetWidth/Height ignore the modal's open animation (getBoundingClientRect would not).
-      const sx = stage.offsetWidth / img.naturalWidth, sy = stage.offsetHeight / img.naturalHeight;
-      _cropBox = { x: x1 * sx, y: y1 * sy, w: (x2 - x1) * sx, h: (y2 - y1) * sy };
-      _renderCropBox();
-      say('Round field found — selected a ' + (x2 - x1) + '×' + (y2 - y1) + ' px square. Adjust it if needed, then press Crop & Continue.');
-    } catch (e) {
-      console.error('[auto-crop] failed:', e);
-      say('Auto-detect failed — drag a box around the area you want analyzed.');
-    }
-  }, 30);
+  try {
+    // Send a small copy: the server only needs the shape of the field, and coordinates come back in its pixels.
+    const k = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k));
+    c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const res = await fetch('/api/detect-field', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.85).split(',')[1] })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (token !== _cropAutoToken) return;                   // superseded by a newer photo / click
+    if (!userClicked && _cropTouched) { say(''); return; }  // don't overwrite a box the user is already drawing
+    if (d.field_shape !== 'round') { say('No round field found — drag a box around the area you want analyzed.'); return; }
+    const [x1, y1, x2, y2] = d.crop_box;
+    const stage = _stageEl();
+    // offsetWidth/Height ignore the modal's open animation (getBoundingClientRect would not).
+    const sx = stage.offsetWidth / c.width, sy = stage.offsetHeight / c.height;
+    _cropBox = { x: x1 * sx, y: y1 * sy, w: (x2 - x1) * sx, h: (y2 - y1) * sy };
+    _renderCropBox();
+    const side = Math.round((x2 - x1) / k);
+    say('Round field found — selected a ' + side + '×' + side + ' px square. Adjust it if needed, then press Crop & Continue.');
+  } catch (e) {
+    if (token === _cropAutoToken) say('Auto-detect unavailable — drag a box around the area you want analyzed.');
+  }
 }
 
 function _stageEl() { return document.getElementById('crop-stage'); }
