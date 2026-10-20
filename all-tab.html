@@ -1137,6 +1137,29 @@ body{background-image:none;}
 }
 
 
+
+/* ── USER GUIDE ── */
+.ug-wrap{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start;}
+.ug-toc{position:sticky;top:0;background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:14px;display:flex;flex-direction:column;gap:2px;}
+.ug-toc a{font-size:12.5px;font-weight:500;color:var(--text-mid);text-decoration:none;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;}
+.ug-toc a:hover{background:var(--crimson-pale);color:var(--crimson-dark);}
+.ug-sec{background:var(--white);border:1px solid var(--warm-gray);border-radius:var(--radius-md);padding:22px 24px;margin-bottom:16px;scroll-margin-top:8px;}
+.ug-sec h3{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--text-dark);margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.ug-num{width:26px;height:26px;border-radius:50%;background:var(--crimson);color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ug-sec h4{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:14px 0 6px;}
+.ug-sec ol,.ug-sec ul{padding-left:20px;font-size:13.5px;line-height:1.8;color:var(--text-mid);}
+.ug-sec p{font-size:13.5px;line-height:1.8;color:var(--text-mid);}
+.ug-note{background:var(--warning-light);border:1px solid var(--warning-ring);border-radius:var(--radius-sm);padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text-mid);margin-top:12px;}
+.ug-flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;font-weight:600;}
+.ug-flow span{background:var(--crimson-pale);color:var(--crimson-dark);padding:6px 12px;border-radius:var(--r-full);}
+.ug-flow i{font-style:normal;color:var(--text-muted);}
+.ug-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.ug-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);padding:8px 10px;border-bottom:1px solid var(--warm-gray);}
+.ug-table td{padding:10px;border-bottom:1px solid var(--off-white);color:var(--text-mid);vertical-align:top;line-height:1.6;}
+.ug-table td:first-child{font-weight:600;color:var(--text-dark);width:28%;}
+.ug-help-link{margin-left:auto;background:none;border:1px solid var(--crimson-light);color:var(--crimson-dark);font:600 11.5px var(--font-ui);padding:6px 12px;border-radius:var(--r-full);cursor:pointer;}
+.ug-help-link:hover{background:var(--crimson-pale);}
+@media(max-width:900px){.ug-wrap{grid-template-columns:1fr;}.ug-toc{position:static;flex-direction:row;flex-wrap:wrap;}}
 </style>
 </head>
 <body>
@@ -1196,6 +1219,10 @@ body{background-image:none;}
     <button class="nav-item" onclick="switchTab('export')">
       <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12V15H15V12"/><path d="M9 3V12M6 9L9 12L12 9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Export / Reports
+    </button>
+    <button class="nav-item" onclick="switchTab('guide')">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3.5C3 2.67 3.67 2 4.5 2H15v12H4.5A1.5 1.5 0 0 0 3 15.5V3.5z"/><path d="M3 15.5A1.5 1.5 0 0 0 4.5 17H15v-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6h5M7 9h3" stroke-linecap="round"/></svg>
+      User Guide
     </button>
     <button class="nav-item" onclick="switchTab('about')">
       <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="7.5"/><path d="M9 8V13M9 6V6.5" stroke-linecap="round"/></svg>
@@ -1381,6 +1408,7 @@ body{background-image:none;}
             <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="7.5"/><circle cx="9" cy="9" r="3.5"/><circle cx="9" cy="9" r="1" fill="currentColor"/></svg>
             Upload Microscope Image for Platelet Count
           </div>
+          <button type="button" class="ug-help-link" onclick="switchTab('guide');document.getElementById('ug-sec-3').scrollIntoView({behavior:'smooth'})">Need help? View guide</button>
         </div>
         <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop zone: upload or drag a microscope blood smear image." onkeydown="if(event.key==='Enter'||event.key===' ')this.click()" onclick="document.getElementById('image-file-input').click()">
           <input type="file" id="image-file-input" accept="image/*" style="display:none;" onchange="handleImageSelect(event)">
@@ -1751,6 +1779,58 @@ body{background-image:none;}
         </div>
       </div>
       <p style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:18px;"><strong>Disclaimer:</strong> This system is intended for educational purposes only. It does not replace professional medical diagnosis, treatment, or consultation. Please seek advice from a licensed healthcare professional.</p>
+    </div>
+
+    <div class="panel" id="panel-guide" role="tabpanel" aria-labelledby="tab-guide">
+      <div style="background:var(--crimson-dark);border-radius:var(--radius-lg);padding:30px 36px;margin-bottom:22px;">
+        <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;color:#fff;margin-bottom:8px;">User Operation Guide</h2>
+        <p style="font-size:13.5px;color:rgba(255,255,255,.75);line-height:1.7;">A practical guide for capturing microscope images, running blood cell image analysis, and managing results. Version 1.1 · October 2026</p>
+      </div>
+      <div class="ug-sec" style="margin-bottom:22px;"><h4 style="margin-top:0;">Quick operating sequence</h4>
+        <div class="ug-flow"><span>Power on</span><i>›</i><span>Open website</span><i>›</i><span>Sign in</span><i>›</i><span>Choose image source</span><i>›</i><span>Capture or upload</span><i>›</i><span>Count Platelets</span><i>›</i><span>Review results</span><i>›</i><span>Save or export</span></div>
+      </div>
+      <div class="ug-wrap">
+        <nav class="ug-toc" aria-label="Guide sections">
+          <a onclick="ugGo(1)">1. Before you begin</a><a onclick="ugGo(2)">2. Sign in</a><a onclick="ugGo(3)">3. Select an image source</a><a onclick="ugGo(4)">4. Run an AI analysis</a><a onclick="ugGo(5)">5. Understand results</a><a onclick="ugGo(6)">6. 10-field session</a><a onclick="ugGo(7)">7. Save &amp; export</a><a onclick="ugGo(8)">8. Troubleshooting</a><a onclick="ugGo(9)">9. Responsible use</a>
+        </nav>
+        <div>
+          <section class="ug-sec" id="ug-sec-1"><h3><span class="ug-num">1</span>Before you begin</h3>
+            <ol><li>Connect the Raspberry Pi inference unit and microscope camera to their power and data connections.</li><li>Confirm the microscope, camera, and network are working. The inference service must be active for AI analysis.</li><li>Open the PlateletWatch website on your phone or computer.</li><li>Prepare a well-focused microscope image with suitable lighting following your laboratory protocol.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-2"><h3><span class="ug-num">2</span>Sign in to PlateletWatch</h3>
+            <ol><li>Select <strong>Sign in</strong> on the landing page.</li><li>Enter your email and password. For a new account, select <strong>Get started</strong>.</li><li>After signing in, go to the dashboard and select <strong>Image Analysis</strong>.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-3"><h3><span class="ug-num">3</span>Select an image source</h3>
+            <h4>Option A: Upload from phone or computer</h4><ol><li>Select <strong>Upload from phone / local</strong> or the image upload area.</li><li>Choose a supported image and check the preview.</li></ol>
+            <h4>Option B: Phone camera</h4><ol><li>Select the camera capture control and allow camera access if requested.</li><li>Position the phone with the microscope, focus, and capture the image.</li></ol>
+            <h4>Option C: Raspberry Pi camera</h4><ol><li>Choose <strong>Raspberry Pi camera</strong> as the source.</li><li>Use the live view to position the specimen and capture an image.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-4"><h3><span class="ug-num">4</span>Run an AI analysis</h3>
+            <ol><li>Confirm the microscope image appears in the image preview.</li><li>Check that the image is clear, properly focused, and well lit. If necessary, capture or upload another image.</li><li>Select <strong>Count Platelets</strong> to start image analysis.</li><li>Review the displayed platelet, RBC, and WBC counts, along with detection overlays, after analysis finishes.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-5"><h3><span class="ug-num">5</span>Understand the results</h3>
+            <table class="ug-table"><tbody>
+              <tr><td>Platelets (PLT)</td><td>Platelet detections recognized in the submitted image.</td></tr>
+              <tr><td>Red blood cells (RBC)</td><td>Red blood cell detections identified by the model.</td></tr>
+              <tr><td>White blood cells (WBC)</td><td>White blood cell detections identified by the model.</td></tr>
+              <tr><td>Detection boxes</td><td>Markers showing recognized cells. Check suspicious or overlapping objects manually.</td></tr>
+              <tr><td>Estimates / risk labels</td><td>Software-generated screening indicators where displayed. These do not replace a verified laboratory blood count or confirm a dengue diagnosis.</td></tr>
+            </tbody></table></section>
+          <section class="ug-sec" id="ug-sec-6"><h3><span class="ug-num">6</span>Optional: 10-field session</h3>
+            <ol><li>Select <strong>10-Field Session</strong> from the Image Analysis area.</li><li>Capture and analyze separate microscope fields following the on-screen instructions.</li><li>When the fields are recorded, select the available finalization control.</li><li>Review the combined result before saving or exporting.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-7"><h3><span class="ug-num">7</span>Save, view, or export</h3>
+            <ol><li>After analysis, select <strong>Save Analysis</strong> when the option is displayed.</li><li>Open <a onclick="switchTab('history')" style="color:var(--crimson-dark);font-weight:600;cursor:pointer;">History</a> to review previously saved results.</li><li>Use <a onclick="switchTab('export')" style="color:var(--crimson-dark);font-weight:600;cursor:pointer;">Export / Reports</a> and verify report details before sharing.</li></ol></section>
+          <section class="ug-sec" id="ug-sec-8"><h3><span class="ug-num">8</span>Troubleshooting</h3>
+            <table class="ug-table"><thead><tr><th>Problem</th><th>What to check</th></tr></thead><tbody>
+              <tr><td>Camera unavailable</td><td>Confirm the Pi and camera are connected, the camera service is running, and no other program is using the camera.</td></tr>
+              <tr><td>Image analysis fails</td><td>Check Raspberry Pi service status, network connection, and server health. Retry with a clear image.</td></tr>
+              <tr><td>Request ends early</td><td>Processing large images takes longer. Ask the operator to review service logs and timeouts.</td></tr>
+              <tr><td>No cells or unusual counts</td><td>Retake a clearer image with appropriate lighting and focus. Compare with a manually reviewed reference.</td></tr>
+              <tr><td>Cannot save history</td><td>Check sign-in status, Supabase connectivity, and account permissions.</td></tr>
+              <tr><td>Camera permission denied</td><td>Allow browser camera permission, then reload the page.</td></tr>
+            </tbody></table></section>
+          <section class="ug-sec" id="ug-sec-9"><h3><span class="ug-num">9</span>Responsible use and data protection</h3>
+            <ol><li>Use patient images only with appropriate permissions and consent.</li><li>Keep sign-in credentials private and sign out on shared devices.</li><li>Verify unusual results with a qualified laboratory professional and a validated hematology method.</li><li>Do not rely on this prototype alone for dengue diagnosis or treatment decisions.</li></ol>
+            <div class="ug-note"><strong>Scope:</strong> Microscopy, specimen preparation, and laboratory handling follow institutional procedures.</div></section>
+        </div>
+      </div>
+      <script>function ugGo(n){var e=document.getElementById('ug-sec-'+n);if(e)e.scrollIntoView({behavior:'smooth',block:'start'});}</script>
     </div>
 
   </div><!-- /content -->
@@ -2309,7 +2389,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // ── Tab switching (smooth animated) ──────────────────────────────────
-const PAGE_TITLES = { dashboard:'Dashboard', analysis:'Image Analysis', history:'History', export:'Export / Reports', about:'About System' };
+const PAGE_TITLES = { dashboard:'Dashboard', analysis:'Image Analysis', history:'History', export:'Export / Reports', guide:'User Guide', about:'About System' };
 
 function switchTab(name) {
   const next = document.getElementById('panel-' + name);
